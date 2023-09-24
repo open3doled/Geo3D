@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Text Include="gamelist.txt" />
+    <Text Include="gamelistComplete.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Geo3D\shaders.cpp" />
+    <ClCompile Include="..\Geo3D\dll_assembler.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Geo3D\dll_assembler.hpp" />
+  </ItemGroup>
+</Project>
