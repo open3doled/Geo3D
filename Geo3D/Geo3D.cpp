@@ -212,7 +212,7 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			newDepth->stencil_read_mask = depth_stencil_state.stencil_read_mask;
 			newDepth->stencil_reference_value = depth_stencil_state.stencil_reference_value;
 			newDepth->stencil_write_mask = depth_stencil_state.stencil_write_mask;
-			*/
+			*/			
 			newDepth->front_stencil_read_mask = depth_stencil_state.front_stencil_read_mask;
 			newDepth->front_stencil_reference_value = depth_stencil_state.front_stencil_reference_value;
 			newDepth->front_stencil_write_mask = depth_stencil_state.front_stencil_write_mask;			
@@ -220,7 +220,7 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			newDepth->back_stencil_read_mask = depth_stencil_state.back_stencil_read_mask;
 			newDepth->back_stencil_reference_value = depth_stencil_state.back_stencil_reference_value;
 			newDepth->back_stencil_write_mask = depth_stencil_state.back_stencil_write_mask;
-
+			
 			so.data = newDepth;
 			pso->objects.push_back(so);
 			break;
@@ -331,7 +331,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	vector<UINT8> cVS_L, cVS_R, cPS_L, cPS_R, cCS_L, cCS_R;
 
 	bool dx9 = device->get_api() == device_api::d3d9;
-	
+
 	ASM = pso->vsASM;
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
@@ -358,7 +358,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 			pso->vs->code_size = pso->vsV.size();
 		}
 	}
-	
+
 	ASM = pso->psASM;
 	if (pso->psEdit.size() > 0) {
 		ASM = pso->psEdit;
@@ -380,12 +380,12 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		pso->cs->code = pso->csV.data();
 		pso->cs->code_size = pso->csV.size();
 	}
-	
+
 	if (VS_L.size() > 0) {
 		cVS_L = assembler(dx9, VS_L, pso->vsV);
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
-	}	
+	}
 	if (PS_L.size() > 0) {
 		cPS_L = assembler(dx9, PS_L, pso->psV);
 		pso->ps->code = cPS_L.data();
@@ -396,15 +396,12 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		pso->cs->code = cCS_L.data();
 		pso->cs->code_size = cCS_L.size();
 	}
-		
+
 	reshade::api::pipeline pipeL;
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeL)) {
-		IUnknown* left = (IUnknown*)pso->Left.handle;
-		if (left != nullptr)
-			left->Release();
 		pso->Left = pipeL;
 	}
-	
+
 	if (VS_R.size() > 0) {
 		cVS_R = assembler(dx9, VS_R, pso->vsV);
 		pso->vs->code = cVS_R.data();
@@ -420,12 +417,9 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		pso->cs->code = cCS_R.data();
 		pso->cs->code_size = cCS_R.size();
 	}
-	
+
 	reshade::api::pipeline pipeR;
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
-		IUnknown* right = (IUnknown*)pso->Right.handle;
-		if (right != nullptr)
-			right->Release();
 		pso->Right = pipeR;
 	}
 }
@@ -444,6 +438,12 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 
 	bool dx9 = device->get_api() == device_api::d3d9;
 
+	if (device->get_api() == device_api::d3d12) {
+		auto root = (ID3D12RootSignature*)layout.handle;
+		//ID3D12VersionedRootSignatureDeserializer()
+		//D3D12CreateVersionedRootSignatureDeserializer()
+	}
+
 	bool pipelines = false;
 	size_t numShaders = 0;
 	for (uint32_t i = 0; i < subobject_count; ++i)
@@ -460,9 +460,6 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 		pipelines = gl_pipelines;
 
 	PSO pso = {};
-	storePipelineStateCrosire(layout, subobject_count, subobjects, &pso);
-	pso.separation = gl_separation;
-	pso.convergence = gl_conv;
 	for (uint32_t i = 0; i < subobject_count; ++i)
 	{
 		switch (subobjects[i].type)
@@ -527,19 +524,25 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.noDraw = true;
 	
+	pso.vsEdit.clear();
 	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.txt", pso.crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.vsEdit = readFile(fix_path / sPath);
+	pso.psEdit.clear();
 	swprintf_s(sPath, MAX_PATH, L"%08lX-ps.txt", pso.crcPS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.psEdit = readFile(fix_path / sPath);
+	pso.csEdit.clear();
 	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.txt", pso.crcPS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.csEdit = readFile(fix_path / sPath);
-
-	updatePipeline(device, &pso);
+	
+	pso.separation = gl_separation;
+	pso.convergence = 0;
 	
 	PSOmap[pipeline.handle] = pso;
+	storePipelineStateCrosire(layout, subobject_count, subobjects, &PSOmap[pipeline.handle]);
+	//updatePipeline(device, &PSOmap[pipeline.handle]);
 }
 
 struct __declspec(uuid("7C1F9990-4D3F-4674-96AB-49E1840C83FC")) CommandListSkip {
@@ -550,7 +553,7 @@ struct __declspec(uuid("7C1F9990-4D3F-4674-96AB-49E1840C83FC")) CommandListSkip 
 };
 
 bool edit = false;
-uint16_t fade = 120;
+uint16_t fade = 60;
 map<uint32_t, uint16_t> vertexShaders;
 map<uint32_t, uint16_t> pixelShaders;
 map<uint32_t, uint16_t> computeShaders;
@@ -626,7 +629,7 @@ static void onReshadePresent(effect_runtime* runtime)
 //static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
 	gl_left = !gl_left;
-
+	
 	auto var = runtime->find_uniform_variable("3DToElse.fx", "framecount");
 	unsigned int framecountElse = 0;
 	runtime->get_uniform_value_uint(var, &framecountElse, 1);
@@ -1111,20 +1114,20 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		if (!reshade::register_addon(hModule))
 			return FALSE;
 		load_config();
-
+		
 		reshade::register_event<reshade::addon_event::init_pipeline>(onInitPipeline);
 		reshade::register_event<reshade::addon_event::bind_pipeline>(onBindPipeline);
 		reshade::register_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
 		reshade::register_event<reshade::addon_event::reshade_present>(onReshadePresent);
-
+		
 		reshade::register_event<reshade::addon_event::draw>(onDraw);
 		reshade::register_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
 		reshade::register_event<reshade::addon_event::draw_or_dispatch_indirect>(onDrawOrDispatchIndirect);
-
+		
 		reshade::register_event<reshade::addon_event::init_command_list>(onInitCommandList);
 		reshade::register_event<reshade::addon_event::destroy_command_list>(onDestroyCommandList);
 		reshade::register_event<reshade::addon_event::reset_command_list>(onResetCommandList);
-		reshade::register_event<reshade::addon_event::destroy_pipeline>(onDestroyPipeline);
+		reshade::register_event<reshade::addon_event::destroy_pipeline>(onDestroyPipeline);		
 		break;
 	case DLL_PROCESS_DETACH:
 		reshade::unregister_addon(hModule);
