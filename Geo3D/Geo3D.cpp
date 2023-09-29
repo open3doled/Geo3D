@@ -460,6 +460,9 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 		pipelines = gl_pipelines;
 
 	PSO pso = {};
+	storePipelineStateCrosire(layout, subobject_count, subobjects, &pso);
+	pso.separation = gl_separation;
+	pso.convergence = gl_conv;
 	for (uint32_t i = 0; i < subobject_count; ++i)
 	{
 		switch (subobjects[i].type)
@@ -537,12 +540,9 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.csEdit = readFile(fix_path / sPath);
 	
-	pso.separation = gl_separation;
-	pso.convergence = 0;
+	updatePipeline(device, &pso);
 	
 	PSOmap[pipeline.handle] = pso;
-	storePipelineStateCrosire(layout, subobject_count, subobjects, &PSOmap[pipeline.handle]);
-	//updatePipeline(device, &PSOmap[pipeline.handle]);
 }
 
 struct __declspec(uuid("7C1F9990-4D3F-4674-96AB-49E1840C83FC")) CommandListSkip {
