@@ -399,9 +399,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		
 	reshade::api::pipeline pipeL;
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeL)) {
-		IUnknown* left = (IUnknown*)pso->Left.handle;
-		if (left != nullptr)
-			left->Release();
 		pso->Left = pipeL;
 	}
 	
@@ -423,9 +420,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	
 	reshade::api::pipeline pipeR;
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
-		IUnknown* right = (IUnknown*)pso->Right.handle;
-		if (right != nullptr)
-			right->Release();
 		pso->Right = pipeR;
 	}
 }
