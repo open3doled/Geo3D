@@ -14,6 +14,7 @@ DWORD strToDWORD(string s);
 extern int gl_dumpBIN;
 extern int gl_dumpRAW;
 extern int gl_dumpASM;
+extern bool gl_DXIL_if;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -473,7 +474,7 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		// Go through the wilderness
 		vector<string> shader;
 		vector<string> shaderS;
-		bool bSmall = true;
+		bool bSmall = !gl_DXIL_if;
 		size_t sizeGap = 0;
 		size_t rowGap = 0;
 

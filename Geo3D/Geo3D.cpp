@@ -15,6 +15,7 @@ int gl_dumpOnly = false;
 int gl_dumpASM = false;
 bool gl_2D = false;
 bool gl_pipelines = false;
+bool gl_DXIL_if = false;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
@@ -332,6 +333,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	bool dx9 = device->get_api() == device_api::d3d9;
 
+	gl_DXIL_if = true;
+
 	ASM = pso->vsASM;
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
@@ -462,7 +465,7 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	PSO pso = {};
 	storePipelineStateCrosire(layout, subobject_count, subobjects, &pso);
 	pso.separation = gl_separation;
-	pso.convergence = gl_conv;
+	pso.convergence = 0;
 	for (uint32_t i = 0; i < subobject_count; ++i)
 	{
 		switch (subobjects[i].type)
@@ -540,7 +543,7 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.csEdit = readFile(fix_path / sPath);
 	
-	updatePipeline(device, &pso);
+	//updatePipeline(device, &pso);
 	
 	PSOmap[pipeline.handle] = pso;
 }
@@ -625,8 +628,8 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 	}
 }
 
-static void onReshadePresent(effect_runtime* runtime)
-//static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
+//static void onReshadePresent(effect_runtime* runtime)
+static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
 	gl_left = !gl_left;
 	
@@ -746,6 +749,23 @@ static void onReshadePresent(effect_runtime* runtime)
 	}
 	for (auto it = toDeleteCS.begin(); it != toDeleteCS.end(); ++it)
 		computeShaders.erase(*it);
+
+	if (runtime->is_key_pressed(VK_F11)) {
+		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
+			PSO* pso = &it->second;
+			if (pixelShaders.count(pso->crcPS) == 1) {
+				filesystem::path fix_path_dump = fix_path / L"Dump";
+				filesystem::create_directories(fix_path_dump);
+				swprintf_s(sPath, MAX_PATH, L"%08lX-ps.skip", pso->crcPS);
+				filesystem::path file = fix_path / sPath;
+				_wfopen_s(&f, file.c_str(), L"wb");
+				if (f != 0) {
+					fwrite(pso->psASM.data(), 1, pso->psASM.size(), f);
+					fclose(f);
+				}
+			}
+		}
+	}
 
 	if (runtime->is_key_pressed(VK_NUMPAD1)) {
 		if (currentPS > 0) {
@@ -1118,7 +1138,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		reshade::register_event<reshade::addon_event::init_pipeline>(onInitPipeline);
 		reshade::register_event<reshade::addon_event::bind_pipeline>(onBindPipeline);
 		reshade::register_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
-		reshade::register_event<reshade::addon_event::reshade_present>(onReshadePresent);
+		//reshade::register_event<reshade::addon_event::reshade_present>(onReshadePresent);
+		reshade::register_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
 		
 		reshade::register_event<reshade::addon_event::draw>(onDraw);
 		reshade::register_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
