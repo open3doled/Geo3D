@@ -44,7 +44,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	string pathName;
 	vector<string> files;
 	FILE* f;
-
+	/*
 	{
 		auto ASM = readFile("ac2-vs.txt");
 		auto ASM2 = patch(true, ASM, true, gl_conv, gl_screenSize, gl_separation);
@@ -68,7 +68,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		auto ASM4 = readFile("SMR-ps.txt");
 		auto ASM5 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
 	}
-	
+	*/
 	char gamebuffer[100000];	
 	InitializeCriticalSection(&gl_CS);
 	vector<string> lines;
@@ -100,12 +100,12 @@ int _tmain(int argc, _TCHAR* argv[])
 //#pragma omp for
 	for (int i = 0; i < files.size(); i++) {
 		string fileName = files[i];
-		EnterCriticalSection(&gl_CS);
+		//EnterCriticalSection(&gl_CS);
 		//auto BIN = readFile(fileName);
 		auto ASM = readFile(fileName);
-		LeaveCriticalSection(&gl_CS);
+		//LeaveCriticalSection(&gl_CS);
 		//auto ASM = disassembler(BIN);
-		
+		/*/
 		if (ASM.size() == 0) {
 			string ASMfilename = fileName;
 			ASMfilename.erase(fileName.size() - 3, 3);
@@ -114,8 +114,14 @@ int _tmain(int argc, _TCHAR* argv[])
 			fwrite(ASM.data(), 1, ASM.size(), f);
 			fclose(f);
 			continue;
-		}
+		}*/
 		if (ASM[0] == ';') {
+			auto left = changeASM(false, ASM, true, 1.0f, 15.6f, 10.0f);
+			auto right = changeASM(false, ASM, false, 1.0f, 15.6f, 10.0f);
+			auto ASMLeft = assembler(false, left, left);
+			auto ASMRight = assembler(false, right, right);
+			auto ASM2 = disassembler(ASMLeft);
+			/*
 			string dxilFilename = fileName;
 			auto dxil = readFile(dxilFilename);
 			dxilFilename.erase(dxilFilename.size() - 3, 3);
@@ -152,7 +158,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			fwrite(DXIL.data(), 1, DXIL.size() - 1, f);
 			fclose(f);
 			continue;
+			*/
 		}
+		/*
 		else {
 			string ASMfilename = fileName;
 			ASMfilename.erase(fileName.size() - 3, 3);
@@ -163,6 +171,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			fclose(f);
 			LeaveCriticalSection(&gl_CS);
 		}
+		*/
 		/*
 		auto CBO = assembler(ASM, BIN);
 		bool valid = true;

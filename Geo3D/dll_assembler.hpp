@@ -17,6 +17,7 @@
 #include <d3d9.h>
 #include "D3DX9Shader.h"
 #include <regex>
+#include <mutex>
 
 using namespace std;
 
@@ -40,7 +41,7 @@ struct token_operand
 	unsigned extended : 1;
 };
 
-vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float gl_separation);
+vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float gl_separation, uint32_t crc = 0);
 vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float screenSize, float separation);
 uint32_t dumpShader(bool dx9, const wchar_t *type, const void *pData, size_t length, bool pipeline = false, uint64_t handle = 0);
 vector<UINT8> asmShader(bool dx9, const void* pData, size_t length);

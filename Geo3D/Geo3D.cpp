@@ -326,6 +326,7 @@ static void  enumerateFiles() {
 	}
 }
 
+mutex m;
 void updatePipeline(reshade::api::device* device, PSO* pso) {
 	vector<UINT8> ASM;
 	vector<UINT8> VS_L, VS_R, PS_L, PS_R, CS_L, CS_R;
@@ -339,7 +340,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
 		auto L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto test = changeASM(dx9, L, true, gl_conv, gl_screenSize, gl_separation);
+		auto test = changeASM(dx9, L, true, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
 		if (test.size() == 0) {
 			VS_L = L;
 			VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
@@ -347,14 +348,14 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		else {
 			VS_L = test;
 			VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-			VS_R = changeASM(dx9, VS_R, false, gl_conv, gl_screenSize, gl_separation);
+			VS_R = changeASM(dx9, VS_R, false, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
 		}
 	}
 	else if (ASM.size() > 0) {
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
 		if (test.size() > 0) {
 			VS_L = test;
-			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
 		}
 		else {
 			pso->vs->code = pso->vsV.data();
@@ -386,16 +387,27 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (VS_L.size() > 0) {
 		cVS_L = assembler(dx9, VS_L, pso->vsV);
+		cVS_R = assembler(dx9, VS_R, pso->vsV);
+	}
+	if (PS_L.size() > 0) {
+		cPS_L = assembler(dx9, PS_L, pso->psV);
+		cPS_R = assembler(dx9, PS_R, pso->psV);
+	}
+	if (CS_L.size() > 0) {
+		cCS_L = assembler(dx9, CS_L, pso->csV);
+		cCS_R = assembler(dx9, CS_R, pso->csV);
+	}
+
+	m.lock();
+	if (VS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
 	}
 	if (PS_L.size() > 0) {
-		cPS_L = assembler(dx9, PS_L, pso->psV);
 		pso->ps->code = cPS_L.data();
 		pso->ps->code_size = cPS_L.size();
 	}
 	if (CS_L.size() > 0) {
-		cCS_L = assembler(dx9, CS_L, pso->csV);
 		pso->cs->code = cCS_L.data();
 		pso->cs->code_size = cCS_L.size();
 	}
@@ -406,17 +418,14 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	}
 
 	if (VS_R.size() > 0) {
-		cVS_R = assembler(dx9, VS_R, pso->vsV);
 		pso->vs->code = cVS_R.data();
 		pso->vs->code_size = cVS_R.size();
 	}
 	if (PS_R.size() > 0) {
-		cPS_R = assembler(dx9, PS_R, pso->psV);
 		pso->ps->code = cPS_R.data();
 		pso->ps->code_size = cPS_R.size();
 	}
 	if (CS_R.size() > 0) {
-		cCS_L = assembler(dx9, CS_R, pso->csV);
 		pso->cs->code = cCS_R.data();
 		pso->cs->code_size = cCS_R.size();
 	}
@@ -425,6 +434,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
 		pso->Right = pipeR;
 	}
+	m.unlock();
 }
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
