@@ -400,15 +400,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 	}
 }
 
-map<uint32_t, vector<UINT8>> DXILleft;
-map<uint32_t, vector<UINT8>> DXILright;
-vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation, uint32_t crc) {
-	if (crc != 0) {
-		if (DXILleft.count(crc) == 1 && left == true)
-			return DXILleft[crc];
-		if (DXILright.count(crc) == 1 && left == false)
-			return DXILright[crc];
-	}
+vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	vector<UINT8> shaderOutput;
 	auto lines = stringToLines((char*)ASM.data(), ASM.size());
 
@@ -596,12 +588,6 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		}
 		shaderOutput.push_back('\n');
 	}
-	if (crc != 0) {
-		if (left == true)
-			DXILleft[crc] = shaderOutput;
-		if (left == false)
-			DXILright[crc] = shaderOutput;
-	}
 	return shaderOutput;
 }
 
@@ -693,9 +679,9 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenS
 	return shaderOut;
 }
 
-vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float separation, uint32_t crc) {
+vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	if (ASM.size() > 0 && ASM[0] == ';')
-		return changeDXIL(ASM, left, conv, screenSize, separation, crc);
+		return changeDXIL(ASM, left, conv, screenSize, separation);
 	if (dx9)
 		return changeASM9(ASM, left, conv, screenSize, separation);
 
