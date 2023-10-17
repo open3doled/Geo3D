@@ -3346,8 +3346,16 @@ vector<UINT8> assembler(bool dx9, vector<UINT8> asmFile, vector<UINT8> buffer) {
 					ComPtr<IDxcValidator> validator;
 					dxil_create_func(CLSID_DxcValidator, __uuidof(IDxcValidator), (void**)&validator);
 					ComPtr<IDxcOperationResult> result;
-					validator->Validate(container_blob.Get(), DxcValidatorFlags_InPlaceEdit /* avoid extra copy owned by dxil.dll */, &result);
+					hr = validator->Validate(container_blob.Get(), DxcValidatorFlags_InPlaceEdit /* avoid extra copy owned by dxil.dll */, &result);
+					if (hr != S_OK) {
+						vector<UINT8> error;
+						return error;
+					}
 				}
+			}
+			else {
+				vector<UINT8> error;
+				return error;
 			}
 		}
 		return ret;

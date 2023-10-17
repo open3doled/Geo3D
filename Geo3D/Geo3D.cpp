@@ -15,6 +15,7 @@ int gl_dumpOnly = false;
 int gl_dumpASM = false;
 bool gl_2D = false;
 bool gl_pipelines = false;
+bool gl_forza = false;
 bool gl_DXIL_if = false;
 
 std::filesystem::path dump_path;
@@ -28,22 +29,23 @@ struct PSO {
 	pipeline_layout layout;
 
 	shader_desc* vs;
+	shader_desc vsCode;
 	uint32_t crcVS;
-	vector<UINT8> vsASM;
-	vector<UINT8> vsV;
 	vector<UINT8> vsEdit;
 
 	shader_desc* ps;
+	shader_desc psCode;
 	uint32_t crcPS;
-	vector<UINT8> psASM;
-	vector<UINT8> psV;
 	vector<UINT8> psEdit;
 
 	shader_desc* cs;
+	shader_desc csCode;
 	uint32_t crcCS;
-	vector<UINT8> csASM;
-	vector<UINT8> csV;
 	vector<UINT8> csEdit;
+
+	uint32_t crcDS;
+	uint32_t crcGS;
+	uint32_t crcHS;
 
 	bool skip;
 	bool noDraw;
@@ -51,7 +53,7 @@ struct PSO {
 	reshade::api::pipeline Left;
 	reshade::api::pipeline Right;
 };
-map<uint64_t, PSO> PSOmap;
+map<uint64_t, PSO*> PSOmap;
 
 static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, PSO* pso) {
 	pso->layout = layout;
@@ -70,7 +72,8 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			const auto shader = static_cast<const shader_desc*>(so.data);
 
 			if (shader == nullptr) {
-				// nothing to see here
+				pso->objects.push_back(so);
+				break;
 			}
 			else {
 				auto newShader = new shader_desc();
@@ -109,12 +112,18 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 					newShader->spec_constant_ids = spec_constant_ids;
 					newShader->spec_constant_values = spec_constant_values;
 				}
-				if (so.type == pipeline_subobject_type::vertex_shader)
+				if (newShader && so.type == pipeline_subobject_type::vertex_shader) {
 					pso->vs = newShader;
-				if (so.type == pipeline_subobject_type::pixel_shader)
+					pso->vsCode = *newShader;
+				}
+				if (newShader && so.type == pipeline_subobject_type::pixel_shader) {
 					pso->ps = newShader;
-				if (so.type == pipeline_subobject_type::compute_shader)
+					pso->psCode = *newShader;
+				}
+				if (newShader && so.type == pipeline_subobject_type::compute_shader) {
 					pso->cs = newShader;
+					pso->csCode = *newShader;
+				}
 				so.data = newShader;
 			}
 			pso->objects.push_back(so);
@@ -328,19 +337,16 @@ static void  enumerateFiles() {
 
 mutex m;
 void updatePipeline(reshade::api::device* device, PSO* pso) {
-	vector<UINT8> ASM;
+	vector<UINT8> ASM, vsV;
 	vector<UINT8> VS_L, VS_R, PS_L, PS_R, CS_L, CS_R;
 	vector<UINT8> cVS_L, cVS_R, cPS_L, cPS_R, cCS_L, cCS_R;
 
 	bool dx9 = device->get_api() == device_api::d3d9;
 
-	gl_DXIL_if = true;
-
-	ASM = pso->vsASM;
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
 		auto L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto test = changeASM(dx9, L, true, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
+		auto test = changeASM(dx9, L, true, gl_conv, gl_screenSize, gl_separation);
 		if (test.size() == 0) {
 			VS_L = L;
 			VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
@@ -348,115 +354,115 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		else {
 			VS_L = test;
 			VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-			VS_R = changeASM(dx9, VS_R, false, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
+			VS_R = changeASM(dx9, VS_R, false, gl_conv, gl_screenSize, gl_separation);
 		}
 	}
-	else if (ASM.size() > 0) {
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
+	else if (pso->vsCode.code_size > 0) {
+		vsV = readV(pso->vsCode.code, pso->vsCode.code_size);
+		ASM = disassembler(vsV);
+		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
 		if (test.size() > 0) {
 			VS_L = test;
-			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation, pso->crcVS);
+			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 		}
 		else {
-			pso->vs->code = pso->vsV.data();
-			pso->vs->code_size = pso->vsV.size();
+			pso->vs->code = pso->vsCode.code;
+			pso->vs->code_size = pso->vsCode.code_size;
 		}
 	}
 
-	ASM = pso->psASM;
 	if (pso->psEdit.size() > 0) {
 		ASM = pso->psEdit;
 		PS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
 		PS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 	}
-	else if (ASM.size() > 0) {
-		pso->ps->code = pso->psV.data();
-		pso->ps->code_size = pso->psV.size();
+	else if (pso->psCode.code_size > 0) {
+		pso->ps->code = pso->psCode.code;
+		pso->ps->code_size = pso->psCode.code_size;
 	}
 
-	ASM = pso->csASM;
 	if (pso->csEdit.size() > 0) {
 		ASM = pso->psEdit;
 		CS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
 		CS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 	}
-	else if (ASM.size() > 0) {
-		pso->cs->code = pso->csV.data();
-		pso->cs->code_size = pso->csV.size();
+	else if (pso->csCode.code_size > 0) {
+		pso->cs->code = pso->csCode.code;
+		pso->cs->code_size = pso->csCode.code_size;
 	}
 
-	if (VS_L.size() > 0) {
-		cVS_L = assembler(dx9, VS_L, pso->vsV);
-		cVS_R = assembler(dx9, VS_R, pso->vsV);
+	if (VS_L.size() > 0 && VS_R.size()) {
+		cVS_L = assembler(dx9, VS_L, vsV);
+		cVS_R = assembler(dx9, VS_R, vsV);
 	}
-	if (PS_L.size() > 0) {
-		cPS_L = assembler(dx9, PS_L, pso->psV);
-		cPS_R = assembler(dx9, PS_R, pso->psV);
+	if (PS_L.size() > 0 && PS_R.size()) {
+		auto psV = readV(pso->psCode.code, pso->psCode.code_size);
+		cPS_L = assembler(dx9, PS_L, psV);
+		cPS_R = assembler(dx9, PS_R, psV);
 	}
-	if (CS_L.size() > 0) {
-		cCS_L = assembler(dx9, CS_L, pso->csV);
-		cCS_R = assembler(dx9, CS_R, pso->csV);
+	if (CS_L.size() > 0 && CS_R.size()) {
+		auto csV = readV(pso->csCode.code, pso->csCode.code_size);
+		cCS_L = assembler(dx9, CS_L, csV);
+		cCS_R = assembler(dx9, CS_R, csV);
 	}
 
-	m.lock();
-	if (VS_L.size() > 0) {
+	if (cVS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
 	}
-	if (PS_L.size() > 0) {
+	if (cPS_L.size() > 0) {
 		pso->ps->code = cPS_L.data();
 		pso->ps->code_size = cPS_L.size();
 	}
-	if (CS_L.size() > 0) {
+	if (cCS_L.size() > 0) {
 		pso->cs->code = cCS_L.data();
 		pso->cs->code_size = cCS_L.size();
 	}
-
+	
+	char sPath[MAX_PATH];
+	if (pso->crcVS) {
+		printf_s(sPath, MAX_PATH, "%08lX-vs.skip", pso->crcVS);
+		reshade::log_message(reshade::log_level::info, sPath);
+	}
+	if (pso->crcCS) {
+		sprintf_s(sPath, MAX_PATH, "%08lX-cs.skip", pso->crcCS);
+		reshade::log_message(reshade::log_level::info, sPath);
+	}
+	
 	reshade::api::pipeline pipeL;
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeL)) {
 		pso->Left = pipeL;
 	}
 
-	if (VS_R.size() > 0) {
+	if (cVS_R.size() > 0) {
 		pso->vs->code = cVS_R.data();
 		pso->vs->code_size = cVS_R.size();
 	}
-	if (PS_R.size() > 0) {
+	if (cPS_R.size() > 0) {
 		pso->ps->code = cPS_R.data();
 		pso->ps->code_size = cPS_R.size();
 	}
-	if (CS_R.size() > 0) {
+	if (cCS_R.size() > 0) {
 		pso->cs->code = cCS_R.data();
 		pso->cs->code_size = cCS_R.size();
-	}
+	}	
 
 	reshade::api::pipeline pipeR;
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
 		pso->Right = pipeR;
 	}
-	m.unlock();
 }
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
 {
-	if (PSOmap.count(pipeline.handle) == 1)
+	/*
+	if (PSOmap.count(pipeline.handle) == 1) {
 		return;
-
-	shader_desc* vs = nullptr;
-	shader_desc* ps = nullptr;
-	shader_desc* ds = nullptr;
-	shader_desc* gs = nullptr;
-	shader_desc* hs = nullptr;
-	shader_desc* cs = nullptr;
+	}
+	*/
 
 	bool dx9 = device->get_api() == device_api::d3d9;
-
-	if (device->get_api() == device_api::d3d12) {
-		auto root = (ID3D12RootSignature*)layout.handle;
-		//ID3D12VersionedRootSignatureDeserializer()
-		//D3D12CreateVersionedRootSignatureDeserializer()
-	}
-
+	
 	bool pipelines = false;
 	size_t numShaders = 0;
 	for (uint32_t i = 0; i < subobject_count; ++i)
@@ -465,96 +471,116 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 		{
 		case pipeline_subobject_type::vertex_shader:
 		case pipeline_subobject_type::pixel_shader:
+		case pipeline_subobject_type::domain_shader:
+		case pipeline_subobject_type::geometry_shader:
+		case pipeline_subobject_type::hull_shader:
 			numShaders++;
 			break;
 		}
 	}
 	if (numShaders > 1)
 		pipelines = gl_pipelines;
+	
+	PSO* pso = new PSO;
+	
+	shader_desc* vs = nullptr;
+	shader_desc* ps = nullptr;
+	shader_desc* ds = nullptr;
+	shader_desc* gs = nullptr;
+	shader_desc* hs = nullptr;
+	shader_desc* cs = nullptr;
 
-	PSO pso = {};
-	storePipelineStateCrosire(layout, subobject_count, subobjects, &pso);
-	pso.separation = gl_separation;
-	pso.convergence = 0;
+	pso->crcVS = 0;
+	pso->crcPS = 0;
+	pso->crcDS = 0;
+	pso->crcGS = 0;
+	pso->crcHS = 0;
+	pso->crcCS = 0;
+
+	pso->cs = nullptr;
+	pso->ps = nullptr;
+	pso->cs = nullptr;
+
+	pso->skip = false;
+	pso->noDraw = false;
+
+	pso->Left.handle = 0;
+	pso->Right.handle = 0;
+		
 	for (uint32_t i = 0; i < subobject_count; ++i)
 	{
 		switch (subobjects[i].type)
 		{
 		case pipeline_subobject_type::vertex_shader:
 			vs = static_cast<shader_desc *>(subobjects[i].data);
-			pso.crcVS = dumpShader(dx9, L"vs", vs->code, vs->code_size, pipelines, pipeline.handle);
-			pso.vsASM = asmShader(dx9, vs->code, vs->code_size);
-			pso.vsV = readV(vs->code, vs->code_size);
+			pso->crcVS = dumpShader(dx9, L"vs", vs->code, vs->code_size, pipelines, pipeline.handle);;
 			break;
 		case pipeline_subobject_type::pixel_shader:
 			ps = static_cast<shader_desc*>(subobjects[i].data);
-			pso.crcPS = dumpShader(dx9, L"ps", ps->code, ps->code_size, pipelines, pipeline.handle);
-			pso.psASM = asmShader(dx9, ps->code, ps->code_size);
-			pso.psV = readV(ps->code, ps->code_size);
+			pso->crcPS = dumpShader(dx9, L"ps", ps->code, ps->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::compute_shader:
 			cs = static_cast<shader_desc*>(subobjects[i].data);
-			pso.crcCS = dumpShader(dx9, L"cs", cs->code, cs->code_size, pipelines, pipeline.handle);
-			pso.csASM = asmShader(dx9, cs->code, cs->code_size);
-			pso.csV = readV(cs->code, cs->code_size);
+			pso->crcCS = dumpShader(dx9, L"cs", cs->code, cs->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::domain_shader:
 			ds = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(dx9, L"ds", ds->code, ds->code_size, pipelines, pipeline.handle);
+			pso->crcDS = dumpShader(dx9, L"ds", ds->code, ds->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::geometry_shader:
 			gs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(dx9, L"gs", gs->code, gs->code_size, pipelines, pipeline.handle);
+			pso->crcGS = dumpShader(dx9, L"gs", gs->code, gs->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::hull_shader:
 			hs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(dx9, L"hs", hs->code, hs->code_size, pipelines, pipeline.handle);
+			pso->crcHS = dumpShader(dx9, L"hs", hs->code, hs->code_size, pipelines, pipeline.handle);
 			break;
 		}
 	}
-
+	
 	if (gl_dumpOnly)
 		return;
 
 	wchar_t sPath[MAX_PATH];
-	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso.crcVS);
+	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.skip = true;
-	swprintf_s(sPath, MAX_PATH, L"%08lX-ps.skip", pso.crcPS);
+		pso->skip = true;
+	swprintf_s(sPath, MAX_PATH, L"%08lX-ps.skip", pso->crcPS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.skip = true;
-	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.skip", pso.crcCS);
+		pso->skip = true;
+	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.skip", pso->crcCS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.skip = true;
+		pso->skip = true;
 
-	if (pso.skip)
-		return;
-
-	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.dump", pso.crcVS);
+	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.dump", pso->crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.noDraw = true;
-	swprintf_s(sPath, MAX_PATH, L"%08lX-ps.dump", pso.crcPS);
+		pso->noDraw = true;
+	swprintf_s(sPath, MAX_PATH, L"%08lX-ps.dump", pso->crcPS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.noDraw = true;
-	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso.crcCS);
+		pso->noDraw = true;
+	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.noDraw = true;
+		pso->noDraw = true;
 	
-	pso.vsEdit.clear();
-	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.txt", pso.crcVS);
+	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.txt", pso->crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.vsEdit = readFile(fix_path / sPath);
-	pso.psEdit.clear();
-	swprintf_s(sPath, MAX_PATH, L"%08lX-ps.txt", pso.crcPS);
+		pso->vsEdit = readFile(fix_path / sPath);
+	swprintf_s(sPath, MAX_PATH, L"%08lX-ps.txt", pso->crcPS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.psEdit = readFile(fix_path / sPath);
-	pso.csEdit.clear();
-	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.txt", pso.crcPS);
+		pso->psEdit = readFile(fix_path / sPath);
+	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.txt", pso->crcCS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
-		pso.csEdit = readFile(fix_path / sPath);
+		pso->csEdit = readFile(fix_path / sPath);
 	
-	//updatePipeline(device, &pso);
-	
+	storePipelineStateCrosire(layout, subobject_count, subobjects, pso);
+	pso->separation = gl_separation;
+	if (gl_forza) {
+		pso->convergence = 0;
+	}
+	else {
+		pso->convergence = gl_conv;
+		updatePipeline(device, pso);
+	}
 	PSOmap[pipeline.handle] = pso;
 }
 
@@ -566,7 +592,7 @@ struct __declspec(uuid("7C1F9990-4D3F-4674-96AB-49E1840C83FC")) CommandListSkip 
 };
 
 bool edit = false;
-uint16_t fade = 60;
+uint16_t fade = 120;
 map<uint32_t, uint16_t> vertexShaders;
 map<uint32_t, uint16_t> pixelShaders;
 map<uint32_t, uint16_t> computeShaders;
@@ -580,22 +606,8 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 	CommandListSkip& commandListData = cmd_list->get_private_data<CommandListSkip>();
 	commandListData.skip = false;
 
-	if (gl_2D)
-		return;
-	
 	if (PSOmap.count(pipeline.handle) == 1) {
-		PSO* pso = &PSOmap[pipeline.handle];
-		
-		if (pso->convergence != gl_conv || pso->separation != gl_separation) {
-			pso->convergence = gl_conv;
-			pso->separation = gl_separation;
-			updatePipeline(cmd_list->get_device(), pso);
-		}
-		
-		if (pso->skip)
-			return;
-		if (pso->noDraw)
-			commandListData.skip = true;
+		PSO* pso = PSOmap[pipeline.handle];
 
 		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = fade;
 		if (currentPS != 0) pixelShaders[currentPS] = fade;
@@ -603,6 +615,22 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 		if (currentVS != 0) vertexShaders[currentVS] = fade;
 		if (pso->crcCS != 0) computeShaders[pso->crcCS] = fade;
 		if (currentCS != 0) computeShaders[currentCS] = fade;
+
+		if (gl_2D)
+			return;
+
+		if (pso->skip)
+			return;
+		if (pso->noDraw)
+			commandListData.skip = true;
+
+		if (pso->convergence != gl_conv || pso->separation != gl_separation) {
+			pso->convergence = gl_conv;
+			pso->separation = gl_separation;
+			if (gl_forza) m.lock();
+			updatePipeline(cmd_list->get_device(), pso);
+			if (gl_forza) m.unlock();
+		}
 		
 		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
 			commandListData.PS = pso->crcPS ? pso->crcPS : -1;
@@ -638,23 +666,26 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 	}
 }
 
-//static void onReshadePresent(effect_runtime* runtime)
-static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
+static void onReshadePresent(effect_runtime* runtime)
+//static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
 	gl_left = !gl_left;
 	
+	/*
 	auto var = runtime->find_uniform_variable("3DToElse.fx", "framecount");
 	unsigned int framecountElse = 0;
 	runtime->get_uniform_value_uint(var, &framecountElse, 1);
 	if (framecountElse > 0)
 		gl_left = (framecountElse % 2) == 0;
-	/*
+	
 	auto var2 = runtime->find_uniform_variable("SpatialLabs_Shift3D.fx", "framecount");
 	unsigned int framecountShift = 0;
 	runtime->get_uniform_value_uint(var2, &framecountShift, 1);
 	if (framecountShift > 0)
 		gl_left = (framecountShift % 2) == 0;
 	*/
+
+	bool dx9 = runtime->get_device()->get_api() == device_api::d3d9;
 
 	if (runtime->is_key_pressed(VK_NUMPAD0)) {
 		if (edit)
@@ -675,7 +706,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	if (runtime->is_key_pressed(VK_F10)) {
 		enumerateFiles();
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
-			PSO* pso = &it->second;
+			PSO* pso = it->second;
 			pso->skip = false;
 			pso->noDraw = false;
 
@@ -762,7 +793,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 
 	if (runtime->is_key_pressed(VK_F11)) {
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
-			PSO* pso = &it->second;
+			PSO* pso = it->second;
 			if (pixelShaders.count(pso->crcPS) == 1) {
 				filesystem::path fix_path_dump = fix_path / L"Dump";
 				filesystem::create_directories(fix_path_dump);
@@ -770,164 +801,171 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				filesystem::path file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
-					fwrite(pso->psASM.data(), 1, pso->psASM.size(), f);
+					auto ASM = asmShader(dx9, pso->psCode.code, pso->psCode.code_size);
+					fwrite(ASM.data(), 1, ASM.size(), f);
 					fclose(f);
 				}
 			}
 		}
 	}
 
-	if (runtime->is_key_pressed(VK_NUMPAD1)) {
-		if (currentPS > 0) {
-			auto it = pixelShaders.find(currentPS);
-			if (it == pixelShaders.begin())
-				currentPS = 0;
-			else
-				currentPS = (--it)->first;
-		}
-		else if (pixelShaders.size() > 0) {
-			currentPS = pixelShaders.rbegin()->first;
-		}
-	}
-	if (runtime->is_key_pressed(VK_NUMPAD2)) {
-		if (pixelShaders.size() > 0) {
-			if (currentPS == 0)
-				currentPS = pixelShaders.begin()->first;
-			else {
+	if (edit && !gl_2D) {
+		if (runtime->is_key_pressed(VK_NUMPAD1)) {
+			if (currentPS > 0) {
 				auto it = pixelShaders.find(currentPS);
-				++it;
-				if (it == pixelShaders.end())
+				if (it == pixelShaders.begin())
 					currentPS = 0;
 				else
-					currentPS = it->first;
+					currentPS = (--it)->first;
+			}
+			else if (pixelShaders.size() > 0) {
+				currentPS = pixelShaders.rbegin()->first;
 			}
 		}
-	}
-	if (runtime->is_key_pressed(VK_NUMPAD3)) {
-		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
-			PSO* pso = &it->second;
-			if (pso->crcPS == currentPS) {
-				filesystem::path file;
-				filesystem::create_directories(fix_path);
-				if (huntUsing2D) {
-					pso->skip = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-ps.skip", pso->crcPS);
-				}
+		if (runtime->is_key_pressed(VK_NUMPAD2)) {
+			if (pixelShaders.size() > 0) {
+				if (currentPS == 0)
+					currentPS = pixelShaders.begin()->first;
 				else {
-					pso->noDraw = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-ps.dump", pso->crcPS);
-				}	
-				file = fix_path / sPath;
-				_wfopen_s(&f, file.c_str(), L"wb");
-				if (f != 0) {
-					fwrite(pso->psASM.data(), 1, pso->psASM.size(), f);
-					fclose(f);
+					auto it = pixelShaders.find(currentPS);
+					++it;
+					if (it == pixelShaders.end())
+						currentPS = 0;
+					else
+						currentPS = it->first;
 				}
 			}
 		}
-	}
-
-	if (runtime->is_key_pressed(VK_NUMPAD4)) {
-		if (currentVS > 0) {
-			auto it = vertexShaders.find(currentVS);
-			if (it == vertexShaders.begin())
-				currentVS = 0;
-			else
-				currentVS = (--it)->first;
+		if (runtime->is_key_pressed(VK_NUMPAD3)) {
+			for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
+				PSO* pso = it->second;
+				if (pso->crcPS == currentPS) {
+					filesystem::path file;
+					filesystem::create_directories(fix_path);
+					if (huntUsing2D) {
+						pso->skip = true;
+						swprintf_s(sPath, MAX_PATH, L"%08lX-ps.skip", pso->crcPS);
+					}
+					else {
+						pso->noDraw = true;
+						swprintf_s(sPath, MAX_PATH, L"%08lX-ps.dump", pso->crcPS);
+					}
+					file = fix_path / sPath;
+					_wfopen_s(&f, file.c_str(), L"wb");
+					if (f != 0) {
+						auto ASM = asmShader(dx9, pso->psCode.code, pso->psCode.code_size);
+						fwrite(ASM.data(), 1, ASM.size(), f);
+						fclose(f);
+					}
+				}
+			}
 		}
-		else if (vertexShaders.size() > 0) {
-			currentVS = vertexShaders.rbegin()->first;
-		}
-	}
-	if (runtime->is_key_pressed(VK_NUMPAD5)) {
-		if (vertexShaders.size() > 0) {
-			if (currentVS == 0)
-				currentVS = vertexShaders.begin()->first;
-			else {
+		if (runtime->is_key_pressed(VK_NUMPAD4)) {
+			if (currentVS > 0) {
 				auto it = vertexShaders.find(currentVS);
-				++it;
-				if (it == vertexShaders.end())
+				if (it == vertexShaders.begin())
 					currentVS = 0;
 				else
-					currentVS = it->first;
+					currentVS = (--it)->first;
+			}
+			else if (vertexShaders.size() > 0) {
+				currentVS = vertexShaders.rbegin()->first;
 			}
 		}
-	}
-	if (runtime->is_key_pressed(VK_NUMPAD6)) {
-		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
-			PSO* pso = &it->second;
-			if (pso->crcVS == currentVS) {
-				filesystem::path file;
-				filesystem::create_directories(fix_path);
-				if (huntUsing2D) {
-					pso->skip = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
-				}
+		if (runtime->is_key_pressed(VK_NUMPAD5)) {
+			if (vertexShaders.size() > 0) {
+				if (currentVS == 0)
+					currentVS = vertexShaders.begin()->first;
 				else {
-					pso->noDraw = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-vs.dump", pso->crcVS);
-				}
-				file = fix_path / sPath;
-				_wfopen_s(&f, file.c_str(), L"wb");
-				if (f != 0) {
-					fwrite(pso->vsASM.data(), 1, pso->vsASM.size(), f);
-					fclose(f);
+					auto it = vertexShaders.find(currentVS);
+					++it;
+					if (it == vertexShaders.end())
+						currentVS = 0;
+					else
+						currentVS = it->first;
 				}
 			}
 		}
-	}
-
-	if (runtime->is_key_pressed(VK_NUMPAD7)) {
-		if (currentCS > 0) {
-			auto it = computeShaders.find(currentCS);
-			if (it == computeShaders.begin())
-				currentCS = 0;
-			else
-				currentCS = (--it)->first;
+		if (runtime->is_key_pressed(VK_NUMPAD6)) {
+			for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
+				PSO* pso = it->second;
+				if (pso->crcVS == currentVS) {
+					filesystem::path file;
+					filesystem::create_directories(fix_path);
+					if (huntUsing2D) {
+						pso->skip = true;
+						swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
+					}
+					else {
+						pso->noDraw = true;
+						swprintf_s(sPath, MAX_PATH, L"%08lX-vs.dump", pso->crcVS);
+					}
+					file = fix_path / sPath;
+					_wfopen_s(&f, file.c_str(), L"wb");
+					if (f != 0) {
+						auto ASM = asmShader(dx9, pso->vsCode.code, pso->vsCode.code_size);
+						fwrite(ASM.data(), 1, ASM.size(), f);
+						fclose(f);
+					}
+				}
+			}
 		}
-		else if (computeShaders.size() > 0) {
-			currentCS = computeShaders.rbegin()->first;
-		}
-	}
-	if (runtime->is_key_pressed(VK_NUMPAD8)) {
-		if (computeShaders.size() > 0) {
-			if (currentCS == 0)
-				currentCS = computeShaders.begin()->first;
-			else {
+		if (runtime->is_key_pressed(VK_NUMPAD7)) {
+			if (currentCS > 0) {
 				auto it = computeShaders.find(currentCS);
-				++it;
-				if (it == computeShaders.end())
+				if (it == computeShaders.begin())
 					currentCS = 0;
 				else
-					currentCS = it->first;
+					currentCS = (--it)->first;
+			}
+			else if (computeShaders.size() > 0) {
+				currentCS = computeShaders.rbegin()->first;
 			}
 		}
-	}
-	if (runtime->is_key_pressed(VK_NUMPAD9)) {
-		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
-			PSO* pso = &it->second;
-			if (pso->crcCS == currentCS) {
-				filesystem::path file;
-				filesystem::create_directories(fix_path);
-				if (huntUsing2D) {
-					pso->skip = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-cs.skip", pso->crcCS);
-				}
+		if (runtime->is_key_pressed(VK_NUMPAD8)) {
+			if (computeShaders.size() > 0) {
+				if (currentCS == 0)
+					currentCS = computeShaders.begin()->first;
 				else {
-					pso->noDraw = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
+					auto it = computeShaders.find(currentCS);
+					++it;
+					if (it == computeShaders.end())
+						currentCS = 0;
+					else
+						currentCS = it->first;
 				}
-				file = fix_path / sPath;
-				_wfopen_s(&f, file.c_str(), L"wb");
-				if (f != 0) {
-					fwrite(pso->csASM.data(), 1, pso->csASM.size(), f);
-					fclose(f);
+			}
+		}
+		if (runtime->is_key_pressed(VK_NUMPAD9)) {
+			for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
+				PSO* pso = it->second;
+				if (pso->crcCS == currentCS) {
+					filesystem::path file;
+					filesystem::create_directories(fix_path);
+					if (huntUsing2D) {
+						pso->skip = true;
+						swprintf_s(sPath, MAX_PATH, L"%08lX-cs.skip", pso->crcCS);
+					}
+					else {
+						pso->noDraw = true;
+						swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
+					}
+					file = fix_path / sPath;
+					_wfopen_s(&f, file.c_str(), L"wb");
+					if (f != 0) {
+						auto ASM = asmShader(dx9, pso->csCode.code, pso->csCode.code_size);
+						fwrite(ASM.data(), 1, ASM.size(), f);
+						fclose(f);
+					}
 				}
 			}
 		}
 	}
 
 	if (runtime->is_key_down(VK_CONTROL)) {
+		if (runtime->is_key_pressed(VK_F1)) {
+			gl_forza = false;
+		}
 		if (runtime->is_key_pressed(VK_F2)) {
 			gl_2D = !gl_2D;
 		}
@@ -992,6 +1030,8 @@ static void load_config()
 
 	reshade::get_config_value(nullptr, "Geo3D", "Pipelines", gl_pipelines);
 
+	reshade::get_config_value(nullptr, "Geo3D", "Forza", gl_forza);
+
 	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
 	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
@@ -1025,7 +1065,7 @@ static void onReshadeOverlay(reshade::api::effect_runtime* runtime)
 			return;
 		}
 
-		ImGui::Text("Geo3D:");
+		ImGui::Text("Geo3D: %s", gl_2D ? "2D mode" : "3D mode");
 		ImGui::Text("Screensizen %.1f", gl_screenSize);
 		ImGui::Text("Separation %.0f", gl_separation);
 		ImGui::Text("Convergence %.2f", gl_conv);
@@ -1091,6 +1131,125 @@ static void onResetCommandList(command_list* commandList)
 
 static void onDestroyPipeline(device* device, reshade::api::pipeline pipelineHandle)
 {
+	/*
+	if (PSOmap.count(pipelineHandle.handle) == 1) {
+		PSO* pso = PSOmap[pipelineHandle.handle];
+		for (uint32_t i = 0; i < pso->objects.size(); ++i)
+		{
+			auto so = pso->objects[i];
+			switch (so.type)
+			{
+			case pipeline_subobject_type::vertex_shader:
+			case pipeline_subobject_type::hull_shader:
+			case pipeline_subobject_type::domain_shader:
+			case pipeline_subobject_type::geometry_shader:
+			case pipeline_subobject_type::pixel_shader:
+			case pipeline_subobject_type::compute_shader:
+			{
+				const auto shader = static_cast<const shader_desc*>(so.data);
+
+				if (shader != nullptr) {
+					delete shader->code;
+					if (shader->entry_point != nullptr)
+						delete shader->entry_point;
+					if (shader->spec_constants > 0) {
+						delete shader->spec_constant_ids;
+						delete shader->spec_constant_values;
+					}
+					delete shader;
+				}
+				break;
+			}
+			case pipeline_subobject_type::input_layout:
+			{
+				const auto input_layout = static_cast<const input_element*>(so.data);
+				for (uint32_t k = 0; k < so.count; ++k)
+				{
+					delete input_layout[k].semantic;
+				}
+				delete input_layout;
+				break;
+			}
+			case pipeline_subobject_type::blend_state:
+			{
+				const auto blend_state = static_cast<const blend_desc*>(so.data);
+				delete blend_state;
+				break;
+			}
+			case pipeline_subobject_type::rasterizer_state:
+			{
+				const auto rasterizer_state = static_cast<const rasterizer_desc*>(so.data);
+				delete rasterizer_state;
+				break;
+			}
+			case pipeline_subobject_type::depth_stencil_state:
+			{
+				const auto depth_stencil_state = static_cast<const depth_stencil_desc*>(so.data);
+				delete depth_stencil_state;
+				break;
+			}
+			case pipeline_subobject_type::stream_output_state:
+			{
+				const auto stream_output_state = static_cast<const stream_output_desc*>(so.data);
+				delete stream_output_state;
+				break;
+			}
+			case pipeline_subobject_type::primitive_topology:
+			{
+				const auto topology = static_cast<const primitive_topology*>(so.data);
+				delete topology;
+				break;
+			}
+			case pipeline_subobject_type::depth_stencil_format:
+			{
+				const auto depth_stencil_format = static_cast<const format*>(so.data);
+				delete depth_stencil_format;
+				break;
+			}
+			case pipeline_subobject_type::render_target_formats:
+			{
+				const auto render_target_formats = static_cast<const format*>(so.data);
+				delete render_target_formats;
+				break;
+			}
+			case pipeline_subobject_type::sample_mask:
+			{
+				const auto sample_mask = static_cast<const uint32_t*>(so.data);
+				delete sample_mask;
+				break;
+			}
+			case pipeline_subobject_type::sample_count:
+			{
+				const auto sample_count = static_cast<const uint32_t*>(so.data);
+				delete sample_count;
+				break;
+			}
+			case pipeline_subobject_type::viewport_count:
+			{
+				const auto viewport_count = static_cast<const uint32_t*>(so.data);
+				delete viewport_count;
+				break;
+			}
+			case pipeline_subobject_type::dynamic_pipeline_states:
+			{
+				const auto dynamic_pipeline_states = static_cast<const dynamic_state*>(so.data);
+				delete dynamic_pipeline_states;
+				break;
+			}
+			}
+		}
+		
+		auto left = (IUnknown*)pso->Left.handle;
+		if (left != nullptr)
+			left->Release();
+
+		auto right = (IUnknown*)pso->Right.handle;
+		if (right != nullptr)
+			right->Release();
+		
+		delete pso;
+	}
+	*/
 	PSOmap.erase(pipelineHandle.handle);
 }
 
@@ -1148,8 +1307,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		reshade::register_event<reshade::addon_event::init_pipeline>(onInitPipeline);
 		reshade::register_event<reshade::addon_event::bind_pipeline>(onBindPipeline);
 		reshade::register_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
-		//reshade::register_event<reshade::addon_event::reshade_present>(onReshadePresent);
-		reshade::register_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
+		reshade::register_event<reshade::addon_event::reshade_present>(onReshadePresent);
+		//reshade::register_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
 		
 		reshade::register_event<reshade::addon_event::draw>(onDraw);
 		reshade::register_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
@@ -1158,7 +1317,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		reshade::register_event<reshade::addon_event::init_command_list>(onInitCommandList);
 		reshade::register_event<reshade::addon_event::destroy_command_list>(onDestroyCommandList);
 		reshade::register_event<reshade::addon_event::reset_command_list>(onResetCommandList);
-		reshade::register_event<reshade::addon_event::destroy_pipeline>(onDestroyPipeline);		
+		//reshade::register_event<reshade::addon_event::destroy_pipeline>(onDestroyPipeline);
 		break;
 	case DLL_PROCESS_DETACH:
 		reshade::unregister_addon(hModule);
