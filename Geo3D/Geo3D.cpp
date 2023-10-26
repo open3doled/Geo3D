@@ -418,17 +418,19 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		pso->cs->code = cCS_L.data();
 		pso->cs->code_size = cCS_L.size();
 	}
-	
-	char sPath[MAX_PATH];
-	if (pso->crcVS) {
-		printf_s(sPath, MAX_PATH, "%08lX-vs.skip", pso->crcVS);
-		reshade::log_message(reshade::log_level::info, sPath);
+
+	if (gl_forza) {
+		char sPath[MAX_PATH];
+		if (pso->crcVS) {
+			sprintf_s(sPath, MAX_PATH, "%08lX-vs.skip", pso->crcVS);
+			reshade::log_message(reshade::log_level::info, sPath);
+		}
+		if (pso->crcCS) {
+			sprintf_s(sPath, MAX_PATH, "%08lX-cs.skip", pso->crcCS);
+			reshade::log_message(reshade::log_level::info, sPath);
+		}
 	}
-	if (pso->crcCS) {
-		sprintf_s(sPath, MAX_PATH, "%08lX-cs.skip", pso->crcCS);
-		reshade::log_message(reshade::log_level::info, sPath);
-	}
-	
+
 	reshade::api::pipeline pipeL;
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeL)) {
 		pso->Left = pipeL;
@@ -609,12 +611,11 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 	if (PSOmap.count(pipeline.handle) == 1) {
 		PSO* pso = PSOmap[pipeline.handle];
 
-		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = fade;
-		if (currentPS != 0) pixelShaders[currentPS] = fade;
-		if (pso->crcVS != 0) vertexShaders[pso->crcVS] = fade;
-		if (currentVS != 0) vertexShaders[currentVS] = fade;
-		if (pso->crcCS != 0) computeShaders[pso->crcCS] = fade;
-		if (currentCS != 0) computeShaders[currentCS] = fade;
+		if (!edit) {
+			if (pso->crcPS != 0) pixelShaders[pso->crcPS] = fade;
+			if (pso->crcVS != 0) vertexShaders[pso->crcVS] = fade;
+			if (pso->crcCS != 0) computeShaders[pso->crcCS] = fade;
+		}
 
 		if (gl_2D)
 			return;
@@ -764,44 +765,46 @@ static void onReshadePresent(effect_runtime* runtime)
 		}
 	}
 
-	vector<uint32_t> toDeleteVS;
-	for (auto it = vertexShaders.begin(); it != vertexShaders.end(); ++it) {
-		it->second--;
-		if (it->second == 0)
-			toDeleteVS.push_back(it->first);
-	}
-	for (auto it = toDeleteVS.begin(); it != toDeleteVS.end(); ++it)
-		vertexShaders.erase(*it);
+	if (!edit) {
+		vector<uint32_t> toDeleteVS;
+		for (auto it = vertexShaders.begin(); it != vertexShaders.end(); ++it) {
+			it->second--;
+			if (it->second == 0)
+				toDeleteVS.push_back(it->first);
+		}
+		for (auto it = toDeleteVS.begin(); it != toDeleteVS.end(); ++it)
+			vertexShaders.erase(*it);
 
-	vector<uint32_t> toDeletePS;
-	for (auto it = pixelShaders.begin(); it != pixelShaders.end(); ++it) {
-		it->second--;
-		if (it->second == 0)
-			toDeletePS.push_back(it->first);
-	}
-	for (auto it = toDeletePS.begin(); it != toDeletePS.end(); ++it)
-		pixelShaders.erase(*it);
+		vector<uint32_t> toDeletePS;
+		for (auto it = pixelShaders.begin(); it != pixelShaders.end(); ++it) {
+			it->second--;
+			if (it->second == 0)
+				toDeletePS.push_back(it->first);
+		}
+		for (auto it = toDeletePS.begin(); it != toDeletePS.end(); ++it)
+			pixelShaders.erase(*it);
 
-	vector<uint32_t> toDeleteCS;
-	for (auto it = computeShaders.begin(); it != computeShaders.end(); ++it) {
-		it->second--;
-		if (it->second == 0)
-			toDeleteCS.push_back(it->first);
+		vector<uint32_t> toDeleteCS;
+		for (auto it = computeShaders.begin(); it != computeShaders.end(); ++it) {
+			it->second--;
+			if (it->second == 0)
+				toDeleteCS.push_back(it->first);
+		}
+		for (auto it = toDeleteCS.begin(); it != toDeleteCS.end(); ++it)
+			computeShaders.erase(*it);
 	}
-	for (auto it = toDeleteCS.begin(); it != toDeleteCS.end(); ++it)
-		computeShaders.erase(*it);
 
 	if (runtime->is_key_pressed(VK_F11)) {
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
 			PSO* pso = it->second;
-			if (pixelShaders.count(pso->crcPS) == 1) {
+			if (vertexShaders.count(pso->crcVS) == 1) {
 				filesystem::path fix_path_dump = fix_path / L"Dump";
 				filesystem::create_directories(fix_path_dump);
-				swprintf_s(sPath, MAX_PATH, L"%08lX-ps.skip", pso->crcPS);
-				filesystem::path file = fix_path / sPath;
+				swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
+				filesystem::path file = fix_path_dump / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
-					auto ASM = asmShader(dx9, pso->psCode.code, pso->psCode.code_size);
+					auto ASM = asmShader(dx9, pso->vsCode.code, pso->vsCode.code_size);
 					fwrite(ASM.data(), 1, ASM.size(), f);
 					fclose(f);
 				}
