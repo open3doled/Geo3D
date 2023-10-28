@@ -794,19 +794,40 @@ static void onReshadePresent(effect_runtime* runtime)
 			computeShaders.erase(*it);
 	}
 
-	if (runtime->is_key_pressed(VK_F11)) {
-		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
-			PSO* pso = it->second;
-			if (vertexShaders.count(pso->crcVS) == 1) {
-				filesystem::path fix_path_dump = fix_path / L"Dump";
-				filesystem::create_directories(fix_path_dump);
-				swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
-				filesystem::path file = fix_path_dump / sPath;
-				_wfopen_s(&f, file.c_str(), L"wb");
-				if (f != 0) {
-					auto ASM = asmShader(dx9, pso->vsCode.code, pso->vsCode.code_size);
-					fwrite(ASM.data(), 1, ASM.size(), f);
-					fclose(f);
+	if (runtime->is_key_down(VK_CONTROL)) {
+		if (runtime->is_key_pressed(VK_F11)) {
+			for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
+				PSO* pso = it->second;
+				if (pixelShaders.count(pso->crcPS) == 1) {
+					filesystem::path fix_path_dump = fix_path / L"Dump";
+					filesystem::create_directories(fix_path_dump);
+					swprintf_s(sPath, MAX_PATH, L"%08lX-ps.skip", pso->crcPS);
+					filesystem::path file = fix_path_dump / sPath;
+					_wfopen_s(&f, file.c_str(), L"wb");
+					if (f != 0) {
+						auto ASM = asmShader(dx9, pso->psCode.code, pso->psCode.code_size);
+						fwrite(ASM.data(), 1, ASM.size(), f);
+						fclose(f);
+					}
+				}
+			}
+		}
+	}
+	else {
+		if (runtime->is_key_pressed(VK_F11)) {
+			for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
+				PSO* pso = it->second;
+				if (vertexShaders.count(pso->crcVS) == 1) {
+					filesystem::path fix_path_dump = fix_path / L"Dump";
+					filesystem::create_directories(fix_path_dump);
+					swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
+					filesystem::path file = fix_path_dump / sPath;
+					_wfopen_s(&f, file.c_str(), L"wb");
+					if (f != 0) {
+						auto ASM = asmShader(dx9, pso->vsCode.code, pso->vsCode.code_size);
+						fwrite(ASM.data(), 1, ASM.size(), f);
+						fclose(f);
+					}
 				}
 			}
 		}

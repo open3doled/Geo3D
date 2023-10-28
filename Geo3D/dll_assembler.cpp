@@ -448,6 +448,8 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		string sOut = lines[outPos];
 		string sX = lines[outPos].substr(outLenght);
 		sX = sX.substr(0, sX.find(')'));
+		string sZ = lines[outPos + 2].substr(outLenght);
+		sZ = sZ.substr(0, sZ.find(')'));
 		string sW = lines[outPos + 3].substr(outLenght);
 		sW = sW.substr(0, sW.find(')'));
 		string start = sOut.substr(0, sOut.find(sX));
