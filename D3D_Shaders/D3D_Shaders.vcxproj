@@ -183,7 +183,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="gamelist.txt" />
-    <Text Include="gamelistComplete.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Geo3D\dll_assembler.cpp" />

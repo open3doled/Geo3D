@@ -15,6 +15,7 @@ extern int gl_dumpBIN;
 extern int gl_dumpRAW;
 extern int gl_dumpASM;
 extern bool gl_DXIL_if;
+extern bool gl_zDepth;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -38,7 +39,7 @@ uint32_t dumpShader(bool dx9, const wchar_t *type, const void *pData, size_t len
 		if (gl_dumpBIN) {
 			filesystem::path file;
 			filesystem::create_directories(dump_path);
-			swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-%s.bin", crc, type);
 			file = dump_path / sPath;
 			_wfopen_s(&f, file.c_str(), L"wb");
 			if (f != 0) {
@@ -47,40 +48,32 @@ uint32_t dumpShader(bool dx9, const wchar_t *type, const void *pData, size_t len
 			}
 		}
 		if (gl_dumpASM) {
-			auto v = readV(pData, length);
-			vector<UINT8> ASM;
-			if (dx9) {
-				ASM = asmShader(dx9, pData, length);
+			auto ASM = asmShader(dx9, pData, length);
+			filesystem::path file;
+			if (handle != 0 && pipeline) {
+				swprintf_s(sPath, MAX_PATH, L"%16llX", handle);
+				auto pipeline_path = dump_path / sPath;
+				filesystem::create_directories(pipeline_path);
+				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
+				file = pipeline_path / sPath;
 			}
 			else {
-				ASM = disassembler(v);
+				filesystem::create_directories(dump_path);
+				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
+				file = dump_path / sPath;
 			}
-			if (ASM.size() > 0) {
-				filesystem::path file;
-				if (handle != 0 && pipeline) {
-					swprintf_s(sPath, MAX_PATH, L"%16llX", handle);
-					auto pipeline_path = dump_path / sPath;
-					filesystem::create_directories(pipeline_path);
-					swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-					file = pipeline_path / sPath;
-				}
-				else {
-					filesystem::create_directories(dump_path);
-					swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-					file = dump_path / sPath;
-				}
-				_wfopen_s(&f, file.c_str(), L"wb");
-				if (f != 0) {
-					fwrite(ASM.data(), 1, ASM.size(), f);
-					fclose(f);
-				}
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(ASM.data(), 1, ASM.size(), f);
+				fclose(f);
 			}
 		}
 	}
 	return crc;
 }
 
-vector<DWORD> changeSM2(vector<DWORD> code, bool left, int tempReg, float conv, float screenSize, float separation) {
+vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenSize, float separation) {
+	int tempReg = 10;
 	vector<DWORD> newCode;
 	bool define = false;
 	for (size_t i = 0; i < code.size(); i++) {
@@ -240,10 +233,12 @@ vector<UINT8> convertSM2(vector<UINT8> asmFile) {
 	}
 
 	size_t vsPos = reg.find("vs_2_0");
-	reg = reg.substr(0, vsPos) + "vs_3_0" + reg.substr(vsPos + 6);
+	if (vsPos != string::npos)
+		reg = reg.substr(0, vsPos) + "vs_3_0" + reg.substr(vsPos + 6);
 
 	size_t psPos = reg.find("ps_2_0");
-	reg = reg.substr(0, psPos) + "ps_3_0" + reg.substr(psPos + 6);
+	if (psPos != string::npos)
+		reg = reg.substr(0, psPos) + "ps_3_0" + reg.substr(psPos + 6);
 
 	size_t dcl_pos = reg.rfind("dcl_");
 	dcl_pos = reg.find("\n", dcl_pos) + 1;
@@ -254,21 +249,17 @@ vector<UINT8> convertSM2(vector<UINT8> asmFile) {
 
 vector<UINT8> asmShader(bool dx9, const void* pData, size_t length) {
 	auto v = readV(pData, length);
-	if (dx9) {
-		LPD3DXBUFFER pDisassembly = NULL;
-		D3DXDisassembleShader((const DWORD*)v.data(), FALSE, NULL, &pDisassembly);
-		auto ASM = readV(pDisassembly->GetBufferPointer(), pDisassembly->GetBufferSize());
-		string reg((char*)ASM.data());
-		if (reg.find("VS_2") != string::npos ||
-			reg.find("PS_2") != string::npos) {
-			return convertSM2(ASM);
-		}
-		else {
-			return ASM;
-		}
+	auto ASM = disassembler(v);
+	if (ASM.size() == 0)
+		return ASM;
+	string reg((char*)ASM.data());
+	if (reg.find("vs_2") != string::npos ||
+		reg.find("ps_2") != string::npos ||
+		reg.find("vs_1") != string::npos) {
+		return convertSM2(ASM);
 	}
 	else {
-		return disassembler(v);
+		return ASM;
 	}
 }
 
@@ -476,7 +467,8 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		// Go through the wilderness
 		vector<string> shader;
 		vector<string> shaderS;
-		bool bSmall = !gl_DXIL_if;
+		//bool bSmall = !gl_DXIL_if;
+		bool bSmall = true;
 		size_t sizeGap = 0;
 		size_t rowGap = 0;
 
@@ -492,9 +484,16 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		string convS(buf);
 
 		if (bSmall) {
-			shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
-			shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
-			shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
+			if (gl_zDepth) {
+				shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sZ + ", " + convS);
+				shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
+				shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
+			}
+			else {
+				shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
+				shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
+				shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
+			}
 			sizeGap = 3;
 			rowGap = 3;
 		}
@@ -648,11 +647,20 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenS
 				string sourceReg = "r" + to_string(tempReg);
 				string calcReg = "r" + to_string(tempReg + 1);
 
-				shader +=
-					"    if_ne " + sourceReg + ".w, c250.z\n" +
-					"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
-					"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n" +
-					"    endif\n";
+				if (gl_zDepth) {
+					shader +=
+						//"    if_ne " + sourceReg + ".z, c250.z\n" +
+						"      add " + calcReg + ".x, " + sourceReg + ".z, c250.x\n" +
+						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n";
+						//"    endif\n";
+				}
+				else {
+					shader +=
+						//"    if_ne " + sourceReg + ".w, c250.z\n" +
+						"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
+						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n";
+						//"    endif\n";
+				}
 			}
 		}
 		else {
@@ -737,16 +745,22 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				string sourceReg = "r" + to_string(temp - 1);
 				string calcReg = "r" + to_string(temp - 2);
 
-				shader +=
-				/*
-				"add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-				"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
-				*/
-				"ne " + calcReg + ".x, " + sourceReg + ".w, l(1.000000)\n" +
-				"if_nz " + calcReg + ".x\n"
-				"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-				"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
-				"endif\n";
+				if (gl_zDepth) {
+					shader +=
+						//"ne " + calcReg + ".x, " + sourceReg + ".z, l(1.000000)\n" +
+						//"if_nz " + calcReg + ".x\n"
+						"  add " + calcReg + ".x, " + sourceReg + ".z, l(" + conv + ")\n" +
+						"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+						//"endif\n";
+				}
+				else {
+					shader +=
+						//"ne " + calcReg + ".x, " + sourceReg + ".w, l(1.000000)\n" +
+						//"if_nz " + calcReg + ".x\n"
+						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+						//"endif\n";
+				}
 			}
 			if (oReg.size() == 0) {
 				// no output
@@ -1095,7 +1109,7 @@ vector<UINT8> disassembler(vector<UINT8> buffer) {
 				return readV(pBlob->GetBufferPointer(), pBlob->GetBufferSize());
 			}
 		}
-		return ret;
+		return readV(asmBuffer, asmSize);
 	}
 
 	UINT8 fourcc[4];
@@ -1108,7 +1122,7 @@ vector<UINT8> disassembler(vector<UINT8> buffer) {
 	UINT8* pPosition = buffer.data();
 	std::memcpy(fourcc, pPosition, 4);
 	if (memcmp(fourcc, "DXBC", 4) != 0) {
-		return ret;
+		return readV(asmBuffer, asmSize);
 	}
 	pPosition += 4;
 	std::memcpy(fHash, pPosition, 16);
@@ -3331,6 +3345,8 @@ vector<UINT8> assembler(bool dx9, vector<UINT8> asmFile, vector<UINT8> buffer) {
 			if (hr == S_OK) {
 				ComPtr<IDxcBlob> pBlob;
 				pRes->GetResult(pBlob.GetAddressOf());
+				if (pBlob == nullptr)
+					return ret;
 				UINT8* pASM = (UINT8*)pBlob->GetBufferPointer();
 				if (pASM == nullptr)
 					return ret;
@@ -3348,16 +3364,8 @@ vector<UINT8> assembler(bool dx9, vector<UINT8> asmFile, vector<UINT8> buffer) {
 					ComPtr<IDxcValidator> validator;
 					dxil_create_func(CLSID_DxcValidator, __uuidof(IDxcValidator), (void**)&validator);
 					ComPtr<IDxcOperationResult> result;
-					hr = validator->Validate(container_blob.Get(), DxcValidatorFlags_InPlaceEdit /* avoid extra copy owned by dxil.dll */, &result);
-					if (hr != S_OK) {
-						vector<UINT8> error;
-						return error;
-					}
+					validator->Validate(container_blob.Get(), DxcValidatorFlags_InPlaceEdit /* avoid extra copy owned by dxil.dll */, &result);
 				}
-			}
-			else {
-				vector<UINT8> error;
-				return error;
 			}
 		}
 		return ret;

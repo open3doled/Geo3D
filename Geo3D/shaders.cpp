@@ -15,6 +15,7 @@ float gl_screenSize = 55;
 float gl_conv = 1.0;
 bool gl_left = false;
 bool gl_DXIL_if = false;
+bool gl_zDepth = false;
 std::filesystem::path dump_path;
 
 vector<string> enumerateFiles(string pathName, string filter = "") {
@@ -91,8 +92,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		pathName = gameName;
 		pathName.append("\\ShaderCache\\");
-		//auto newFiles = enumerateFiles(pathName, "????????-??.bin");
-		auto newFiles = enumerateFiles(pathName, "????????-??.txt");
+		auto newFiles = enumerateFiles(pathName, "????????-??.bin");
+		//auto newFiles = enumerateFiles(pathName, "????????-??.txt");
 		files.insert(files.end(), newFiles.begin(), newFiles.end());
 	}
 
@@ -100,113 +101,41 @@ int _tmain(int argc, _TCHAR* argv[])
 //#pragma omp for
 	for (int i = 0; i < files.size(); i++) {
 		string fileName = files[i];
-		//EnterCriticalSection(&gl_CS);
-		//auto BIN = readFile(fileName);
-		auto ASM = readFile(fileName);
-		//LeaveCriticalSection(&gl_CS);
-		//auto ASM = disassembler(BIN);
-		/*/
-		if (ASM.size() == 0) {
-			string ASMfilename = fileName;
-			ASMfilename.erase(fileName.size() - 3, 3);
-			ASMfilename.append("error.txt");
-			fopen_s(&f, ASMfilename.c_str(), "wb");
-			fwrite(ASM.data(), 1, ASM.size(), f);
-			fclose(f);
-			continue;
-		}*/
-		if (ASM[0] == ';') {
-			auto left = changeASM(false, ASM, true, 1.0f, 15.6f, 10.0f);
-			auto right = changeASM(false, ASM, false, 1.0f, 15.6f, 10.0f);
-			auto ASMLeft = assembler(false, left, left);
-			auto ASMRight = assembler(false, right, right);
-			auto ASM2 = disassembler(ASMLeft);
-			/*
-			string dxilFilename = fileName;
-			auto dxil = readFile(dxilFilename);
-			dxilFilename.erase(dxilFilename.size() - 3, 3);
-			dxilFilename.append("DXIL");
-			fopen_s(&f, dxilFilename.c_str(), "wb");
-			fwrite(dxil.data(), 1, dxil.size() - 1, f);
-			fclose(f);
-
-			auto DXILm = toDXILm(dxil);
-			dxilFilename.erase(dxilFilename.size() - 4, 4);
-			dxilFilename.append("DXILm");
-			fopen_s(&f, dxilFilename.c_str(), "wb");
-			fwrite(DXILm.data(), 1, DXILm.size() - 1, f);
-			fclose(f);
-
-			auto DXIL = fromDXILm(DXILm);
-			bool valid = true;
-			if (DXIL.size() == dxil.size()) {
-				for (size_t i = 0; i < dxil.size(); i++) {
-					if (DXIL[i] != dxil[i]) {
-						valid = false;
-						break;
-					}
-				}
-			}
-			else {
-				valid = false;
-			}
-			if (valid)
-				continue;
-			dxilFilename.erase(dxilFilename.size() - 5, 5);
-			dxilFilename.append("DXIL_Restored");
-			fopen_s(&f, dxilFilename.c_str(), "wb");
-			fwrite(DXIL.data(), 1, DXIL.size() - 1, f);
-			fclose(f);
-			continue;
-			*/
-		}
-		/*
-		else {
-			string ASMfilename = fileName;
-			ASMfilename.erase(fileName.size() - 3, 3);
-			ASMfilename.append("txt");
-			EnterCriticalSection(&gl_CS);
-			fopen_s(&f, ASMfilename.c_str(), "wb");
-			fwrite(ASM.data(), 1, ASM.size(), f);
-			fclose(f);
-			LeaveCriticalSection(&gl_CS);
-		}
-		*/
-		/*
-		auto CBO = assembler(ASM, BIN);
-		bool valid = true;
-		if (CBO.size() == BIN.size()) {
-			for (size_t i = 0; i < CBO.size(); i++) {
-				if (CBO[i] != BIN[i]) {
-					valid = false;
-					break;
-				}
-			}
-		}
-		else {
-			valid = false;
-		}
-		
-		if (!valid) {
-			fileName.erase(fileName.size() - 3, 3);
-			fileName.append("cbo");
-			FILE* f;
-			fopen_s(&f, fileName.c_str(), "wb");
-			fwrite(CBO.data(), 1, CBO.size(), f);
-			fclose(f);
-
-			fileName.erase(fileName.size() - 3, 3);
-			fileName.append("fail.txt");
-			auto ASM2 = disassembler(CBO);
-			if (ASM2.size() > 0) {
-				fopen_s(&f, fileName.c_str(), "wb");
-				fwrite(ASM2.data(), 1, ASM2.size(), f);
+		auto BIN = readFile(fileName);
+		ID3DBlob* pDissassembly;
+		LPCSTR error = nullptr;
+		HRESULT hr = D3DDisassemble(BIN.data(), BIN.size(), 0, error, &pDissassembly);
+		if (hr == S_OK) {
+			auto ASM = readV(pDissassembly->GetBufferPointer(), pDissassembly->GetBufferSize());
+			if (ASM.size() > 0) {
+				string write = fileName + ".ASM";
+				fopen_s(&f, write.c_str(), "wb");
+				fwrite(ASM.data(), 1, ASM.size(), f);
 				fclose(f);
 			}
 		}
-		*/
+		else {
+			DWORD* dw = (DWORD*)BIN.data();
+			int dwSize = BIN.size() / 4;
+			vector<DWORD> temp;
+			for (int i = 0; i < dwSize; i++) {
+				temp.push_back(*(dw + i));
+			}
+			temp = changeSM2(temp, true, gl_conv, gl_screenSize, gl_separation);
+			UINT8* db = (UINT8*)temp.data();
+			int dbSize = temp.size() * 4;
+			vector<UINT8> BIN2;
+			for (int i = 0; i < dbSize; i++) {
+				BIN2.push_back(*(db + i));
+			}
+			if (BIN2.size() > 0) {
+				string write = fileName + ".BIN2";
+				fopen_s(&f, write.c_str(), "wb");
+				fwrite(BIN2.data(), 1, BIN2.size(), f);
+				fclose(f);
+			}
+		}
 	}
-	writeLUT();
 	cout << endl;
 	return 0;
 }
