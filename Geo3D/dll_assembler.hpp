@@ -45,7 +45,7 @@ vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenS
 vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float gl_separation);
 vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float screenSize, float separation);
 uint32_t dumpShader(bool dx9, const wchar_t *type, const void *pData, size_t length, bool pipeline = false, uint64_t handle = 0);
-vector<UINT8> asmShader(bool dx9, const void* pData, size_t length);
+vector<UINT8> asmShader(const void* pData, size_t length);
 vector<UINT8> readV(const void *code, size_t length);
 vector<UINT8> readFile(string fileName);
 vector<UINT8> readFile(wstring fileName);

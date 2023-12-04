@@ -48,7 +48,7 @@ uint32_t dumpShader(bool dx9, const wchar_t *type, const void *pData, size_t len
 			}
 		}
 		if (gl_dumpASM) {
-			auto ASM = asmShader(dx9, pData, length);
+			auto ASM = asmShader(pData, length);
 			filesystem::path file;
 			if (handle != 0 && pipeline) {
 				swprintf_s(sPath, MAX_PATH, L"%16llX", handle);
@@ -247,7 +247,7 @@ vector<UINT8> convertSM2(vector<UINT8> asmFile) {
 	return readV(reg.data(), reg.size());
 }
 
-vector<UINT8> asmShader(bool dx9, const void* pData, size_t length) {
+vector<UINT8> asmShader(const void* pData, size_t length) {
 	auto v = readV(pData, length);
 	auto ASM = disassembler(v);
 	if (ASM.size() == 0)

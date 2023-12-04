@@ -356,7 +356,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		}
 	}
 	else if (pso->vsS.code_size > 0) {
-		auto ASM = asmShader(dx9, pso->vsS.code, pso->vsS.code_size);
+		auto ASM = asmShader(pso->vsS.code, pso->vsS.code_size);
 		/*
 		if (ASM.size() == 0) {
 			auto v = readV(pso->vsS.code, pso->vsS.code_size);
@@ -383,14 +383,20 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 			}
 		}
 		*/
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		if (test.size() > 0) {
-			VS_L = test;
-			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-		}
-		else {
+		if (ASM.size() == 0) {
 			pso->vs->code = pso->vsS.code;
 			pso->vs->code_size = pso->vsS.code_size;
+		}
+		else {
+			auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+			if (test.size() > 0) {
+				VS_L = test;
+				VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			}
+			else {
+				pso->vs->code = pso->vsS.code;
+				pso->vs->code_size = pso->vsS.code_size;
+			}
 		}
 	}
 
@@ -604,6 +610,7 @@ uint32_t currentVS = 0;
 uint32_t currentPS = 0;
 uint32_t currentCS = 0;
 bool huntUsing2D = true;
+PSO* pso2 = nullptr;
 
 static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade::api::pipeline pipeline)
 {
@@ -622,10 +629,24 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 			updatePipeline(cmd_list->get_device(), pso);
 		}
 		
-		if (pso->skip)
-			return;
-		if (pso->noDraw)
-			commandListData.skip = true;
+		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
+			if (pso->skip)
+				return;
+			if (pso->noDraw)
+				commandListData.skip = true;
+		}
+		else {
+			if (pso->skip || pso->noDraw)
+				pso2 = pso;
+			else if (pso->crcVS)
+				pso2 = nullptr;
+			if (pso2 != nullptr) {
+				if (pso2->skip)
+					return;
+				if (pso2->noDraw)
+					commandListData.skip = true;
+			}
+		}
 
 		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = fade;
 		if (currentPS != 0) pixelShaders[currentPS] = fade;
@@ -802,7 +823,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 					filesystem::path file = fix_path_dump / sPath;
 					_wfopen_s(&f, file.c_str(), L"wb");
 					if (f != 0) {
-						auto ASM = asmShader(dx9, pso->csS.code, pso->csS.code_size);
+						auto ASM = asmShader(pso->csS.code, pso->csS.code_size);
 						fwrite(ASM.data(), 1, ASM.size(), f);
 						fclose(f);
 					}
@@ -814,7 +835,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 					filesystem::path file = fix_path_dump / sPath;
 					_wfopen_s(&f, file.c_str(), L"wb");
 					if (f != 0) {
-						auto ASM = asmShader(dx9, pso->vsS.code, pso->vsS.code_size);
+						auto ASM = asmShader(pso->vsS.code, pso->vsS.code_size);
 						fwrite(ASM.data(), 1, ASM.size(), f);
 						fclose(f);
 					}
@@ -826,7 +847,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 					filesystem::path file = fix_path_dump / sPath;
 					_wfopen_s(&f, file.c_str(), L"wb");
 					if (f != 0) {
-						auto ASM = asmShader(dx9, pso->psS.code, pso->psS.code_size);
+						auto ASM = asmShader(pso->psS.code, pso->psS.code_size);
 						fwrite(ASM.data(), 1, ASM.size(), f);
 						fclose(f);
 					}
@@ -878,7 +899,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
-					auto ASM = asmShader(dx9, pso->psS.code, pso->psS.code_size);
+					auto ASM = asmShader(pso->psS.code, pso->psS.code_size);
 					fwrite(ASM.data(), 1, ASM.size(), f);
 					fclose(f);
 				}
@@ -929,7 +950,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
-					auto ASM = asmShader(dx9, pso->vsS.code, pso->vsS.code_size);
+					auto ASM = asmShader(pso->vsS.code, pso->vsS.code_size);
 					fwrite(ASM.data(), 1, ASM.size(), f);
 					fclose(f);
 				}
@@ -980,7 +1001,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
-					auto ASM = asmShader(dx9, pso->csS.code, pso->csS.code_size);
+					auto ASM = asmShader(pso->csS.code, pso->csS.code_size);
 					fwrite(ASM.data(), 1, ASM.size(), f);
 					fclose(f);
 				}
@@ -1069,8 +1090,8 @@ static void load_config()
 
 	std::filesystem::path game_file_path = file_prefix;
 	dump_path = game_file_path.parent_path();
-	fix_path = dump_path / L"ShaderFixes";
-	dump_path /= L"ShaderCache";
+	fix_path = dump_path / L"ShaderFixesGeo3D";
+	dump_path /= L"ShaderCacheGeo3D";
 	enumerateFiles();
 
 	bool debug = false;
