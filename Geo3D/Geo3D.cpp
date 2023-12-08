@@ -522,27 +522,27 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 		{
 		case pipeline_subobject_type::vertex_shader:
 			vs = static_cast<shader_desc *>(subobjects[i].data);
-			pso.crcVS = dumpShader(dx9, L"vs", vs->code, vs->code_size, pipelines, pipeline.handle);
+			pso.crcVS = dumpShader(L"vs", vs->code, vs->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::pixel_shader:
 			ps = static_cast<shader_desc*>(subobjects[i].data);
-			pso.crcPS = dumpShader(dx9, L"ps", ps->code, ps->code_size, pipelines, pipeline.handle);
+			pso.crcPS = dumpShader(L"ps", ps->code, ps->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::compute_shader:
 			cs = static_cast<shader_desc*>(subobjects[i].data);
-			pso.crcCS = dumpShader(dx9, L"cs", cs->code, cs->code_size, pipelines, pipeline.handle);
+			pso.crcCS = dumpShader(L"cs", cs->code, cs->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::domain_shader:
 			ds = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(dx9, L"ds", ds->code, ds->code_size, pipelines, pipeline.handle);
+			dumpShader(L"ds", ds->code, ds->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::geometry_shader:
 			gs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(dx9, L"gs", gs->code, gs->code_size, pipelines, pipeline.handle);
+			dumpShader(L"gs", gs->code, gs->code_size, pipelines, pipeline.handle);
 			break;
 		case pipeline_subobject_type::hull_shader:
 			hs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(dx9, L"hs", hs->code, hs->code_size, pipelines, pipeline.handle);
+			dumpShader(L"hs", hs->code, hs->code_size, pipelines, pipeline.handle);
 			break;
 		}
 	}

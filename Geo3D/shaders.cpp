@@ -18,6 +18,26 @@ bool gl_DXIL_if = false;
 bool gl_zDepth = false;
 std::filesystem::path dump_path;
 
+// Primary hash calculation for all shader file names, all textures.
+// 64 bit magic FNV-0 and FNV-1 prime
+#define FNV_64_PRIME ((UINT64)0x100000001b3ULL)
+static UINT64 fnv_64_buf(const void* buf, size_t len)
+{
+	UINT64 hval = 0;
+	unsigned const char* bp = (unsigned const char*)buf;	/* start of buffer */
+	unsigned const char* be = bp + len;		/* beyond end of buffer */
+
+	// FNV-1 hash each octet of the buffer
+	while (bp < be)
+	{
+		// multiply by the 64 bit FNV magic prime mod 2^64 */
+		hval *= FNV_64_PRIME;
+		// xor the bottom with the current octet
+		hval ^= (UINT64)*bp++;
+	}
+	return hval;
+}
+
 vector<string> enumerateFiles(string pathName, string filter = "") {
 	vector<string> files;
 	WIN32_FIND_DATAA FindFileData;
@@ -45,31 +65,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	string pathName;
 	vector<string> files;
 	FILE* f;
-	/*
-	{
-		auto ASM = readFile("ac2-vs.txt");
-		auto ASM2 = patch(true, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto ASM3 = changeASM(true, ASM2, true, gl_conv, gl_screenSize, gl_screenSize);
-		auto ASM4 = readFile("ac2-ps.txt");
-		auto ASM5 = patch(true, ASM, true, gl_conv, gl_screenSize, gl_separation);
-	}
 
-	{
-		auto ASM = readFile("bio-vs.txt");
-		auto ASM2 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto ASM3 = changeASM(false, ASM2, true, gl_conv, gl_screenSize, gl_screenSize);
-		auto ASM4 = readFile("bio-ps.txt");
-		auto ASM5 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-	}
-
-	{
-		auto ASM = readFile("SMR-vs.txt");
-		auto ASM2 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto ASM3 = changeASM(false, ASM2, true, gl_conv, gl_screenSize, gl_screenSize);
-		auto ASM4 = readFile("SMR-ps.txt");
-		auto ASM5 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-	}
-	*/
 	char gamebuffer[100000];	
 	InitializeCriticalSection(&gl_CS);
 	vector<string> lines;
@@ -91,7 +87,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		cout << gameName << endl;
 
 		pathName = gameName;
-		pathName.append("\\ShaderCache\\");
+		pathName.append("\\ShaderCacheGeo3D\\");
 		auto newFiles = enumerateFiles(pathName, "????????-??.bin");
 		//auto newFiles = enumerateFiles(pathName, "????????-??.txt");
 		files.insert(files.end(), newFiles.begin(), newFiles.end());
@@ -102,6 +98,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	for (int i = 0; i < files.size(); i++) {
 		string fileName = files[i];
 		auto BIN = readFile(fileName);
+		auto crc2 = fnv_64_buf(BIN.data(), BIN.size());
+		printf_s("%s-%016llX", fileName.c_str(), crc2);
+		cout << endl;
+		//s_stromgf
+		/*
 		ID3DBlob* pDissassembly;
 		LPCSTR error = nullptr;
 		HRESULT hr = D3DDisassemble(BIN.data(), BIN.size(), 0, error, &pDissassembly);
@@ -135,6 +136,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				fclose(f);
 			}
 		}
+		*/
 	}
 	cout << endl;
 	return 0;

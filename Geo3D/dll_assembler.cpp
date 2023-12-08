@@ -31,7 +31,7 @@ vector<UINT8> ret;
 	return ret;
 }
 
-uint32_t dumpShader(bool dx9, const wchar_t *type, const void *pData, size_t length, bool pipeline, uint64_t handle) {
+uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline, uint64_t handle) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
 	FILE *f;
 	wchar_t sPath[MAX_PATH];
