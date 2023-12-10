@@ -785,31 +785,31 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		}
 	}
 
-	vector<uint32_t> toDeleteVS;
-	for (auto it = vertexShaders.begin(); it != vertexShaders.end(); ++it) {
+	vector<uint32_t> toDelete;
+	for (auto it = vertexShaders.begin(); it != vertexShaders.end(); it++) {
 		it->second--;
 		if (it->second == 0)
-			toDeleteVS.push_back(it->first);
+			toDelete.push_back(it->first);
 	}
-	for (auto it = toDeleteVS.begin(); it != toDeleteVS.end(); ++it)
+	for (auto it = toDelete.begin(); it != toDelete.end(); it++)
 		vertexShaders.erase(*it);
+	toDelete.clear();
 
-	vector<uint32_t> toDeletePS;
-	for (auto it = pixelShaders.begin(); it != pixelShaders.end(); ++it) {
+	for (auto it = pixelShaders.begin(); it != pixelShaders.end(); it++) {
 		it->second--;
 		if (it->second == 0)
-			toDeletePS.push_back(it->first);
+			toDelete.push_back(it->first);
 	}
-	for (auto it = toDeletePS.begin(); it != toDeletePS.end(); ++it)
+	for (auto it = toDelete.begin(); it != toDelete.end(); it++)
 		pixelShaders.erase(*it);
+	toDelete.clear();
 
-	vector<uint32_t> toDeleteCS;
-	for (auto it = computeShaders.begin(); it != computeShaders.end(); ++it) {
+	for (auto it = computeShaders.begin(); it != computeShaders.end(); it++) {
 		it->second--;
 		if (it->second == 0)
-			toDeleteCS.push_back(it->first);
+			toDelete.push_back(it->first);
 	}
-	for (auto it = toDeleteCS.begin(); it != toDeleteCS.end(); ++it)
+	for (auto it = toDelete.begin(); it != toDelete.end(); it++)
 		computeShaders.erase(*it);
 
 	if (runtime->is_key_pressed(VK_F11)) {
