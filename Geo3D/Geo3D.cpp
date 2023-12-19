@@ -357,32 +357,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	}
 	else if (pso->vsS.code_size > 0) {
 		auto ASM = asmShader(pso->vsS.code, pso->vsS.code_size);
-		/*
-		if (ASM.size() == 0) {
-			auto v = readV(pso->vsS.code, pso->vsS.code_size);
-			DWORD* dw = (DWORD*)v.data();
-			int dwSize = v.size() / 4;
-			vector<DWORD> temp;
-			for (int i = 0; i < dwSize; i++) {
-				temp.push_back(*(dw + i));
-			}
-
-			auto left = changeSM2(temp, true, gl_conv, gl_screenSize, gl_separation);
-			UINT8* db = (UINT8*)left.data();
-			int dbSize = temp.size() * 4;
-			vector<UINT8> leftASM;
-			for (int i = 0; i < dbSize; i++) {
-				cVS_L.push_back(*(db + i));
-			}
-
-			auto right = changeSM2(temp, false, gl_conv, gl_screenSize, gl_separation);
-			db = (UINT8*)right.data();
-			dbSize = temp.size() * 4;
-			for (int i = 0; i < dbSize; i++) {
-				cVS_R.push_back(*(db + i));
-			}
-		}
-		*/
 		if (ASM.size() == 0) {
 			pso->vs->code = pso->vsS.code;
 			pso->vs->code_size = pso->vsS.code_size;
@@ -1076,6 +1050,8 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
 
 	reshade::get_config_value(nullptr, "Geo3D", "Pipelines", gl_pipelines);
+
+	reshade::get_config_value(nullptr, "Geo3D", "Edit", edit);
 
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 
