@@ -11,9 +11,6 @@ After heavy development I have reached v1.2.5.
 - Shadows
 - Ray Tracing
 
-# Homepage
-Http://flugan.net
-
 # Discord
 https://discord.gg/ugJ2fsUq3r
 
