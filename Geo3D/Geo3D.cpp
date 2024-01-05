@@ -496,27 +496,27 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 		{
 		case pipeline_subobject_type::vertex_shader:
 			vs = static_cast<shader_desc *>(subobjects[i].data);
-			pso.crcVS = dumpShader(L"vs", vs->code, vs->code_size, pipelines, pipeline.handle);
+			pso.crcVS = dumpShader(L"vs", vs->code, vs->code_size, pipelines);
 			break;
 		case pipeline_subobject_type::pixel_shader:
 			ps = static_cast<shader_desc*>(subobjects[i].data);
-			pso.crcPS = dumpShader(L"ps", ps->code, ps->code_size, pipelines, pipeline.handle);
+			pso.crcPS = dumpShader(L"ps", ps->code, ps->code_size, pipelines);
 			break;
 		case pipeline_subobject_type::compute_shader:
 			cs = static_cast<shader_desc*>(subobjects[i].data);
-			pso.crcCS = dumpShader(L"cs", cs->code, cs->code_size, pipelines, pipeline.handle);
+			pso.crcCS = dumpShader(L"cs", cs->code, cs->code_size);
 			break;
 		case pipeline_subobject_type::domain_shader:
 			ds = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"ds", ds->code, ds->code_size, pipelines, pipeline.handle);
+			dumpShader(L"ds", ds->code, ds->code_size, pipelines);
 			break;
 		case pipeline_subobject_type::geometry_shader:
 			gs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"gs", gs->code, gs->code_size, pipelines, pipeline.handle);
+			dumpShader(L"gs", gs->code, gs->code_size, pipelines);
 			break;
 		case pipeline_subobject_type::hull_shader:
 			hs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"hs", hs->code, hs->code_size, pipelines, pipeline.handle);
+			dumpShader(L"hs", hs->code, hs->code_size, pipelines);
 			break;
 		}
 	}
@@ -665,22 +665,13 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 
 static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
-	gl_left = !gl_left;
 	bool dx9 = runtime->get_device()->get_api() == device_api::d3d9;
 
-	/*
 	auto var = runtime->find_uniform_variable("3DToElse.fx", "framecount");
 	unsigned int framecountElse = 0;
 	runtime->get_uniform_value_uint(var, &framecountElse, 1);
 	if (framecountElse > 0)
 		gl_left = (framecountElse % 2) == 0;
-	
-	auto var2 = runtime->find_uniform_variable("SpatialLabs_Shift3D.fx", "framecount");
-	unsigned int framecountShift = 0;
-	runtime->get_uniform_value_uint(var2, &framecountShift, 1);
-	if (framecountShift > 0)
-		gl_left = (framecountShift % 2) == 0;
-	*/
 
 	if (runtime->is_key_pressed(VK_NUMPAD0)) {
 		if (edit)
@@ -759,33 +750,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		}
 	}
 
-	vector<uint32_t> toDelete;
-	for (auto it = vertexShaders.begin(); it != vertexShaders.end(); it++) {
-		it->second--;
-		if (it->second == 0)
-			toDelete.push_back(it->first);
-	}
-	for (auto it = toDelete.begin(); it != toDelete.end(); it++)
-		vertexShaders.erase(*it);
-	toDelete.clear();
-
-	for (auto it = pixelShaders.begin(); it != pixelShaders.end(); it++) {
-		it->second--;
-		if (it->second == 0)
-			toDelete.push_back(it->first);
-	}
-	for (auto it = toDelete.begin(); it != toDelete.end(); it++)
-		pixelShaders.erase(*it);
-	toDelete.clear();
-
-	for (auto it = computeShaders.begin(); it != computeShaders.end(); it++) {
-		it->second--;
-		if (it->second == 0)
-			toDelete.push_back(it->first);
-	}
-	for (auto it = toDelete.begin(); it != toDelete.end(); it++)
-		computeShaders.erase(*it);
-
+	
 	if (runtime->is_key_pressed(VK_F11)) {
 		filesystem::path fix_path_dump = fix_path / L"Dump";
 		filesystem::create_directories(fix_path_dump);
@@ -1177,6 +1142,7 @@ bool blockDrawCallForCommandList(command_list* commandList)
 
 static bool onDraw(command_list* commandList, uint32_t vertex_count, uint32_t instance_count, uint32_t first_vertex, uint32_t first_instance)
 {
+	//commandList->draw(vertex_count, instance_count, first_vertex, first_instance)
 	// check if for this command list the active shader handles are part of the blocked set. If so, return true
 	return blockDrawCallForCommandList(commandList);
 }
@@ -1184,6 +1150,7 @@ static bool onDraw(command_list* commandList, uint32_t vertex_count, uint32_t in
 
 static bool onDrawIndexed(command_list* commandList, uint32_t index_count, uint32_t instance_count, uint32_t first_index, int32_t vertex_offset, uint32_t first_instance)
 {
+	//commandList->draw_indexed(index_count, instance_count, first_index, vertex_offset, first_instance)
 	// same as onDraw
 	return blockDrawCallForCommandList(commandList);
 }

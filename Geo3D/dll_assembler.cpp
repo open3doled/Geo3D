@@ -31,7 +31,7 @@ vector<UINT8> ret;
 	return ret;
 }
 
-uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline, uint64_t handle) {
+uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
 	FILE *f;
 	wchar_t sPath[MAX_PATH];
@@ -50,8 +50,8 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool 
 		if (gl_dumpASM) {
 			auto ASM = asmShader(pData, length);
 			filesystem::path file;
-			if (handle != 0 && pipeline) {
-				swprintf_s(sPath, MAX_PATH, L"%16llX", handle);
+			if (pipeline) {
+				swprintf_s(sPath, MAX_PATH, L"%08lX", crc);
 				auto pipeline_path = dump_path / sPath;
 				filesystem::create_directories(pipeline_path);
 				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
