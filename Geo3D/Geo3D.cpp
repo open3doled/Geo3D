@@ -4,6 +4,7 @@
 #include <imgui.h>
 #include <reshade.hpp>
 #include "dll_assembler.hpp"
+#include "crc32_hash.hpp"
 
 bool gl_left = false;
 
@@ -495,12 +496,13 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 		switch (subobjects[i].type)
 		{
 		case pipeline_subobject_type::vertex_shader:
-			vs = static_cast<shader_desc *>(subobjects[i].data);
-			pso.crcVS = dumpShader(L"vs", vs->code, vs->code_size, pipelines);
+			vs = static_cast<shader_desc*>(subobjects[i].data);
+			pso.crcVS = compute_crc32((UINT8*)vs->code, vs->code_size);
+			dumpShader(L"vs", vs->code, vs->code_size, pipelines, pso.crcVS);
 			break;
 		case pipeline_subobject_type::pixel_shader:
 			ps = static_cast<shader_desc*>(subobjects[i].data);
-			pso.crcPS = dumpShader(L"ps", ps->code, ps->code_size, pipelines);
+			pso.crcPS = dumpShader(L"ps", ps->code, ps->code_size, pipelines, pso.crcVS);
 			break;
 		case pipeline_subobject_type::compute_shader:
 			cs = static_cast<shader_desc*>(subobjects[i].data);
@@ -508,15 +510,15 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 			break;
 		case pipeline_subobject_type::domain_shader:
 			ds = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"ds", ds->code, ds->code_size, pipelines);
+			dumpShader(L"ds", ds->code, ds->code_size, pipelines, pso.crcVS);
 			break;
 		case pipeline_subobject_type::geometry_shader:
 			gs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"gs", gs->code, gs->code_size, pipelines);
+			dumpShader(L"gs", gs->code, gs->code_size, pipelines, pso.crcVS);
 			break;
 		case pipeline_subobject_type::hull_shader:
 			hs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"hs", hs->code, hs->code_size, pipelines);
+			dumpShader(L"hs", hs->code, hs->code_size, pipelines, pso.crcVS);
 			break;
 		}
 	}
@@ -576,7 +578,6 @@ struct __declspec(uuid("7C1F9990-4D3F-4674-96AB-49E1840C83FC")) CommandListSkip 
 };
 
 bool edit = false;
-uint16_t fade = 300;
 map<uint32_t, uint16_t> vertexShaders;
 map<uint32_t, uint16_t> pixelShaders;
 map<uint32_t, uint16_t> computeShaders;
@@ -622,12 +623,9 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 			}
 		}
 
-		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = fade;
-		if (currentPS != 0) pixelShaders[currentPS] = fade;
-		if (pso->crcVS != 0) vertexShaders[pso->crcVS] = fade;
-		if (currentVS != 0) vertexShaders[currentVS] = fade;
-		if (pso->crcCS != 0) computeShaders[pso->crcCS] = fade;
-		if (currentCS != 0) computeShaders[currentCS] = fade;
+		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = 1;
+		if (pso->crcVS != 0) vertexShaders[pso->crcVS] = 1;
+		if (pso->crcCS != 0) computeShaders[pso->crcCS] = 1;
 		
 		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
 			commandListData.PS = pso->crcPS ? pso->crcPS : -1;
@@ -667,11 +665,15 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 {
 	bool dx9 = runtime->get_device()->get_api() == device_api::d3d9;
 
+	/*
 	auto var = runtime->find_uniform_variable("3DToElse.fx", "framecount");
 	unsigned int framecountElse = 0;
 	runtime->get_uniform_value_uint(var, &framecountElse, 1);
 	if (framecountElse > 0)
 		gl_left = (framecountElse % 2) == 0;
+	*/
+
+	gl_left = !gl_left;
 
 	if (runtime->is_key_pressed(VK_NUMPAD0)) {
 		if (edit)
@@ -769,8 +771,8 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				}
 			}
 			else if (runtime->is_key_down(VK_CONTROL)) {
-				if (vertexShaders.count(pso->crcPS) == 1) {
-					swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcPS);
+				if (vertexShaders.count(pso->crcVS) == 1) {
+					swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
 					filesystem::path file = fix_path_dump / sPath;
 					_wfopen_s(&f, file.c_str(), L"wb");
 					if (f != 0) {
