@@ -11,8 +11,8 @@ After heavy development I have reached v1.2.5.
 - Shadows
 - Ray Tracing
 
-# Discord
-https://discord.gg/ugJ2fsUq3r
+# Installer
+https://github.com/Flugan/Geo3D-Installer
 
 # YouTube
 http://youtube.com/@ulfjalmbrant
