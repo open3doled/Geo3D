@@ -661,6 +661,10 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 	}
 }
 
+static void onPresent(command_queue* queue, swapchain* swapchain, const rect* source_rect, const rect* dest_rect, uint32_t dirty_rect_count, const rect* dirty_rects) {
+	gl_left = !gl_left;
+}
+
 static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
 	bool dx9 = runtime->get_device()->get_api() == device_api::d3d9;
@@ -672,8 +676,6 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	if (framecountElse > 0)
 		gl_left = (framecountElse % 2) == 0;
 	*/
-
-	gl_left = !gl_left;
 
 	if (runtime->is_key_pressed(VK_NUMPAD0)) {
 		if (edit)
@@ -1188,6 +1190,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		reshade::register_event<reshade::addon_event::bind_pipeline>(onBindPipeline);
 		reshade::register_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
 		reshade::register_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
+		reshade::register_event<reshade::addon_event::present>(onPresent);
 		
 		reshade::register_event<reshade::addon_event::draw>(onDraw);
 		reshade::register_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
