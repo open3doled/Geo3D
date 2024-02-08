@@ -667,8 +667,6 @@ static void onPresent(command_queue* queue, swapchain* swapchain, const rect* so
 
 static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
-	bool dx9 = runtime->get_device()->get_api() == device_api::d3d9;
-
 	/*
 	auto var = runtime->find_uniform_variable("3DToElse.fx", "framecount");
 	unsigned int framecountElse = 0;
