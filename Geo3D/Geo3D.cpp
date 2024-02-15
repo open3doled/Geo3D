@@ -19,6 +19,7 @@ bool gl_pipelines = false;
 bool gl_DXIL_if = false;
 bool gl_quickLoad = false;
 bool gl_zDepth = false;
+bool gl_initPipeline = false;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
@@ -452,10 +453,10 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
 {
-	/*
-	if (PSOmap.count(pipeline.handle) == 1)
-		return;
-	*/
+	if (gl_initPipeline) {
+		if (PSOmap.count(pipeline.handle) == 1)
+			return;
+	}
 
 	shader_desc* vs = nullptr;
 	shader_desc* ps = nullptr;
@@ -1023,6 +1024,8 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 
 	reshade::get_config_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
+
+	reshade::get_config_value(nullptr, "Geo3D", "initPipeline", gl_initPipeline);	
 	
 	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
