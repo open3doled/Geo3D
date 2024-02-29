@@ -19,7 +19,7 @@ bool gl_pipelines = false;
 bool gl_DXIL_if = false;
 bool gl_quickLoad = false;
 bool gl_zDepth = false;
-bool gl_initPipeline = false;
+bool gl_initPipelineOnce = true;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
@@ -216,11 +216,10 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			newDepth->front_stencil_func = depth_stencil_state.front_stencil_func;
 			newDepth->front_stencil_pass_op = depth_stencil_state.front_stencil_pass_op;
 			newDepth->stencil_enable = depth_stencil_state.stencil_enable;
-			/*
 			newDepth->stencil_read_mask = depth_stencil_state.stencil_read_mask;
 			newDepth->stencil_reference_value = depth_stencil_state.stencil_reference_value;
 			newDepth->stencil_write_mask = depth_stencil_state.stencil_write_mask;
-			*/			
+			/*
 			newDepth->front_stencil_read_mask = depth_stencil_state.front_stencil_read_mask;
 			newDepth->front_stencil_reference_value = depth_stencil_state.front_stencil_reference_value;
 			newDepth->front_stencil_write_mask = depth_stencil_state.front_stencil_write_mask;			
@@ -228,7 +227,7 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			newDepth->back_stencil_read_mask = depth_stencil_state.back_stencil_read_mask;
 			newDepth->back_stencil_reference_value = depth_stencil_state.back_stencil_reference_value;
 			newDepth->back_stencil_write_mask = depth_stencil_state.back_stencil_write_mask;
-			
+			*/
 			so.data = newDepth;
 			pso->objects.push_back(so);
 			break;
@@ -453,7 +452,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
 {
-	if (gl_initPipeline) {
+	if (gl_initPipelineOnce) {
 		if (PSOmap.count(pipeline.handle) == 1)
 			return;
 	}
@@ -1005,31 +1004,31 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 			gl_conv *= 1.11f;
 		}
 		if (runtime->is_key_pressed(VK_F7)) {
-			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
-			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
+			reshade::config_set_value(nullptr, "Geo3D", "Convergence", gl_conv);
+			reshade::config_set_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 	}
 }
 
 static void load_config()
 {
-	reshade::get_config_value(nullptr, "Geo3D", "DumpOnly", gl_dumpOnly);
-	reshade::get_config_value(nullptr, "Geo3D", "DumpBIN", gl_dumpBIN);
-	reshade::get_config_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
+	reshade::config_get_value(nullptr, "Geo3D", "DumpOnly", gl_dumpOnly);
+	reshade::config_get_value(nullptr, "Geo3D", "DumpBIN", gl_dumpBIN);
+	reshade::config_get_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
 
-	reshade::get_config_value(nullptr, "Geo3D", "Pipelines", gl_pipelines);
+	reshade::config_get_value(nullptr, "Geo3D", "Pipelines", gl_pipelines);
 
-	reshade::get_config_value(nullptr, "Geo3D", "Edit", edit);
+	reshade::config_get_value(nullptr, "Geo3D", "Edit", edit);
 
-	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
+	reshade::config_get_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 
-	reshade::get_config_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
+	reshade::config_get_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
 
-	reshade::get_config_value(nullptr, "Geo3D", "initPipeline", gl_initPipeline);	
+	reshade::config_get_value(nullptr, "Geo3D", "initPipelineOnce", gl_initPipelineOnce);	
 	
-	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
-	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
-	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
+	reshade::config_get_value(nullptr, "Geo3D", "Convergence", gl_conv);
+	reshade::config_get_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
+	reshade::config_get_value(nullptr, "Geo3D", "Separation", gl_separation);
 
 	WCHAR file_prefix[MAX_PATH] = L"";
 	GetModuleFileNameW(nullptr, file_prefix, ARRAYSIZE(file_prefix));
@@ -1041,7 +1040,7 @@ static void load_config()
 	enumerateFiles();
 
 	bool debug = false;
-	reshade::get_config_value(nullptr, "Geo3D", "Debug", debug);
+	reshade::config_get_value(nullptr, "Geo3D", "Debug", debug);
 	if (debug) {
 		do {
 			Sleep(250);
