@@ -216,18 +216,19 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			newDepth->front_stencil_func = depth_stencil_state.front_stencil_func;
 			newDepth->front_stencil_pass_op = depth_stencil_state.front_stencil_pass_op;
 			newDepth->stencil_enable = depth_stencil_state.stencil_enable;
+			/*
 			newDepth->stencil_read_mask = depth_stencil_state.stencil_read_mask;
 			newDepth->stencil_reference_value = depth_stencil_state.stencil_reference_value;
 			newDepth->stencil_write_mask = depth_stencil_state.stencil_write_mask;
-			/*
+			*/
 			newDepth->front_stencil_read_mask = depth_stencil_state.front_stencil_read_mask;
 			newDepth->front_stencil_reference_value = depth_stencil_state.front_stencil_reference_value;
-			newDepth->front_stencil_write_mask = depth_stencil_state.front_stencil_write_mask;			
+			newDepth->front_stencil_write_mask = depth_stencil_state.front_stencil_write_mask;
 
 			newDepth->back_stencil_read_mask = depth_stencil_state.back_stencil_read_mask;
 			newDepth->back_stencil_reference_value = depth_stencil_state.back_stencil_reference_value;
 			newDepth->back_stencil_write_mask = depth_stencil_state.back_stencil_write_mask;
-			*/
+
 			so.data = newDepth;
 			pso->objects.push_back(so);
 			break;
@@ -549,7 +550,7 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso.crcCS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.noDraw = true;
-	
+
 	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.txt", pso.crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.vsEdit = readFile(fix_path / sPath);
@@ -559,14 +560,14 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.txt", pso.crcPS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.csEdit = readFile(fix_path / sPath);
-	
+
 	if (gl_quickLoad) {
 		pso.convergence = 0;
 	}
 	else {
 		updatePipeline(device, &pso);
 	}
-	
+
 	PSOmap[pipeline.handle] = pso;
 }
 
@@ -594,16 +595,16 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 
 	if (gl_2D)
 		return;
-	
+
 	if (PSOmap.count(pipeline.handle) == 1) {
 		PSO* pso = &PSOmap[pipeline.handle];
-		
+
 		if (pso->convergence != gl_conv || pso->separation != gl_separation) {
 			pso->convergence = gl_conv;
 			pso->separation = gl_separation;
 			updatePipeline(cmd_list->get_device(), pso);
 		}
-		
+
 		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
 			if (pso->skip)
 				return;
@@ -626,7 +627,7 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = 1;
 		if (pso->crcVS != 0) vertexShaders[pso->crcVS] = 1;
 		if (pso->crcCS != 0) computeShaders[pso->crcCS] = 1;
-		
+
 		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
 			commandListData.PS = pso->crcPS ? pso->crcPS : -1;
 			commandListData.VS = pso->crcVS ? pso->crcVS : -1;
@@ -636,7 +637,7 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 			commandListData.VS = pso->crcVS ? pso->crcVS : commandListData.VS;
 		}
 		commandListData.CS = pso->crcCS ? pso->crcCS : commandListData.CS;
-		
+
 		if (currentPS > 0 && currentPS == commandListData.PS || currentVS > 0 && currentVS == commandListData.VS || currentCS > 0 && currentCS == commandListData.CS) {
 			if (huntUsing2D) {
 				return;
@@ -645,7 +646,7 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 				commandListData.skip = true;
 			}
 		}
-		
+
 		if ((stage & pipeline_stage::vertex_shader) != 0 ||
 			(stage & pipeline_stage::pixel_shader) != 0 ||
 			(stage & pipeline_stage::compute_shader) != 0) {
@@ -752,7 +753,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		}
 	}
 
-	
+
 	if (runtime->is_key_pressed(VK_F11)) {
 		filesystem::path fix_path_dump = fix_path / L"Dump";
 		filesystem::create_directories(fix_path_dump);
@@ -836,7 +837,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				else {
 					pso->noDraw = true;
 					swprintf_s(sPath, MAX_PATH, L"%08lX-ps.dump", pso->crcPS);
-				}	
+				}
 				file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
@@ -1004,31 +1005,31 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 			gl_conv *= 1.11f;
 		}
 		if (runtime->is_key_pressed(VK_F7)) {
-			reshade::config_set_value(nullptr, "Geo3D", "Convergence", gl_conv);
-			reshade::config_set_value(nullptr, "Geo3D", "Separation", gl_separation);
+			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
+			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 	}
 }
 
 static void load_config()
 {
-	reshade::config_get_value(nullptr, "Geo3D", "DumpOnly", gl_dumpOnly);
-	reshade::config_get_value(nullptr, "Geo3D", "DumpBIN", gl_dumpBIN);
-	reshade::config_get_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
+	reshade::get_config_value(nullptr, "Geo3D", "DumpOnly", gl_dumpOnly);
+	reshade::get_config_value(nullptr, "Geo3D", "DumpBIN", gl_dumpBIN);
+	reshade::get_config_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
 
-	reshade::config_get_value(nullptr, "Geo3D", "Pipelines", gl_pipelines);
+	reshade::get_config_value(nullptr, "Geo3D", "Pipelines", gl_pipelines);
 
-	reshade::config_get_value(nullptr, "Geo3D", "Edit", edit);
+	reshade::get_config_value(nullptr, "Geo3D", "Edit", edit);
 
-	reshade::config_get_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
+	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 
-	reshade::config_get_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
+	reshade::get_config_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
 
-	reshade::config_get_value(nullptr, "Geo3D", "initPipelineOnce", gl_initPipelineOnce);	
-	
-	reshade::config_get_value(nullptr, "Geo3D", "Convergence", gl_conv);
-	reshade::config_get_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
-	reshade::config_get_value(nullptr, "Geo3D", "Separation", gl_separation);
+	reshade::get_config_value(nullptr, "Geo3D", "initPipelineOnce", gl_initPipelineOnce);
+
+	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
+	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
+	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 
 	WCHAR file_prefix[MAX_PATH] = L"";
 	GetModuleFileNameW(nullptr, file_prefix, ARRAYSIZE(file_prefix));
@@ -1040,7 +1041,7 @@ static void load_config()
 	enumerateFiles();
 
 	bool debug = false;
-	reshade::config_get_value(nullptr, "Geo3D", "Debug", debug);
+	reshade::get_config_value(nullptr, "Geo3D", "Debug", debug);
 	if (debug) {
 		do {
 			Sleep(250);
@@ -1191,11 +1192,11 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		reshade::register_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
 		reshade::register_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
 		reshade::register_event<reshade::addon_event::present>(onPresent);
-		
+
 		reshade::register_event<reshade::addon_event::draw>(onDraw);
 		reshade::register_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
 		reshade::register_event<reshade::addon_event::draw_or_dispatch_indirect>(onDrawOrDispatchIndirect);
-		
+
 		reshade::register_event<reshade::addon_event::init_command_list>(onInitCommandList);
 		reshade::register_event<reshade::addon_event::destroy_command_list>(onDestroyCommandList);
 		reshade::register_event<reshade::addon_event::reset_command_list>(onResetCommandList);
