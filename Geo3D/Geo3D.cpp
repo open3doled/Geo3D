@@ -4,7 +4,6 @@
 #include <imgui.h>
 #include <reshade.hpp>
 #include "dll_assembler.hpp"
-#include "crc32_hash.hpp"
 
 bool gl_left = false;
 
@@ -17,7 +16,7 @@ int gl_dumpASM = false;
 bool gl_2D = false;
 bool gl_pipelines = false;
 bool gl_DXIL_if = false;
-bool gl_quickLoad = false;
+bool gl_quickLoad = true;
 bool gl_zDepth = false;
 bool gl_initPipelineOnce = true;
 
@@ -220,15 +219,15 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			newDepth->stencil_read_mask = depth_stencil_state.stencil_read_mask;
 			newDepth->stencil_reference_value = depth_stencil_state.stencil_reference_value;
 			newDepth->stencil_write_mask = depth_stencil_state.stencil_write_mask;
-			*/
+			*/			
 			newDepth->front_stencil_read_mask = depth_stencil_state.front_stencil_read_mask;
 			newDepth->front_stencil_reference_value = depth_stencil_state.front_stencil_reference_value;
-			newDepth->front_stencil_write_mask = depth_stencil_state.front_stencil_write_mask;
+			newDepth->front_stencil_write_mask = depth_stencil_state.front_stencil_write_mask;			
 
 			newDepth->back_stencil_read_mask = depth_stencil_state.back_stencil_read_mask;
 			newDepth->back_stencil_reference_value = depth_stencil_state.back_stencil_reference_value;
 			newDepth->back_stencil_write_mask = depth_stencil_state.back_stencil_write_mask;
-
+			
 			so.data = newDepth;
 			pso->objects.push_back(so);
 			break;
@@ -359,20 +358,14 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	}
 	else if (pso->vsS.code_size > 0) {
 		auto ASM = asmShader(pso->vsS.code, pso->vsS.code_size);
-		if (ASM.size() == 0) {
-			pso->vs->code = pso->vsS.code;
-			pso->vs->code_size = pso->vsS.code_size;
+		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		if (test.size() > 0) {
+			VS_L = test;
+			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 		}
 		else {
-			auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-			if (test.size() > 0) {
-				VS_L = test;
-				VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-			}
-			else {
-				pso->vs->code = pso->vsS.code;
-				pso->vs->code_size = pso->vsS.code_size;
-			}
+			pso->vs->code = pso->vsS.code;
+			pso->vs->code_size = pso->vsS.code_size;
 		}
 	}
 
@@ -469,8 +462,6 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 
 	if (device->get_api() == device_api::d3d12) {
 		auto root = (ID3D12RootSignature*)layout.handle;
-		//ID3D12VersionedRootSignatureDeserializer()
-		//D3D12CreateVersionedRootSignatureDeserializer()
 	}
 
 	bool pipelines = false;
@@ -550,7 +541,7 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso.crcCS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.noDraw = true;
-
+	
 	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.txt", pso.crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.vsEdit = readFile(fix_path / sPath);
@@ -560,14 +551,14 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.txt", pso.crcPS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.csEdit = readFile(fix_path / sPath);
-
+	
 	if (gl_quickLoad) {
 		pso.convergence = 0;
 	}
 	else {
 		updatePipeline(device, &pso);
 	}
-
+	
 	PSOmap[pipeline.handle] = pso;
 }
 
@@ -595,16 +586,16 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 
 	if (gl_2D)
 		return;
-
+	
 	if (PSOmap.count(pipeline.handle) == 1) {
 		PSO* pso = &PSOmap[pipeline.handle];
-
+		
 		if (pso->convergence != gl_conv || pso->separation != gl_separation) {
 			pso->convergence = gl_conv;
 			pso->separation = gl_separation;
 			updatePipeline(cmd_list->get_device(), pso);
 		}
-
+		
 		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
 			if (pso->skip)
 				return;
@@ -627,7 +618,7 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = 1;
 		if (pso->crcVS != 0) vertexShaders[pso->crcVS] = 1;
 		if (pso->crcCS != 0) computeShaders[pso->crcCS] = 1;
-
+		
 		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
 			commandListData.PS = pso->crcPS ? pso->crcPS : -1;
 			commandListData.VS = pso->crcVS ? pso->crcVS : -1;
@@ -637,7 +628,7 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 			commandListData.VS = pso->crcVS ? pso->crcVS : commandListData.VS;
 		}
 		commandListData.CS = pso->crcCS ? pso->crcCS : commandListData.CS;
-
+		
 		if (currentPS > 0 && currentPS == commandListData.PS || currentVS > 0 && currentVS == commandListData.VS || currentCS > 0 && currentCS == commandListData.CS) {
 			if (huntUsing2D) {
 				return;
@@ -646,7 +637,7 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 				commandListData.skip = true;
 			}
 		}
-
+		
 		if ((stage & pipeline_stage::vertex_shader) != 0 ||
 			(stage & pipeline_stage::pixel_shader) != 0 ||
 			(stage & pipeline_stage::compute_shader) != 0) {
@@ -837,7 +828,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				else {
 					pso->noDraw = true;
 					swprintf_s(sPath, MAX_PATH, L"%08lX-ps.dump", pso->crcPS);
-				}
+				}	
 				file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
@@ -1026,7 +1017,7 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
 
 	reshade::get_config_value(nullptr, "Geo3D", "initPipelineOnce", gl_initPipelineOnce);
-
+	
 	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
 	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
@@ -1192,11 +1183,11 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 		reshade::register_event<reshade::addon_event::reshade_overlay>(onReshadeOverlay);
 		reshade::register_event<reshade::addon_event::reshade_begin_effects>(onReshadeBeginEffects);
 		reshade::register_event<reshade::addon_event::present>(onPresent);
-
+		
 		reshade::register_event<reshade::addon_event::draw>(onDraw);
 		reshade::register_event<reshade::addon_event::draw_indexed>(onDrawIndexed);
 		reshade::register_event<reshade::addon_event::draw_or_dispatch_indirect>(onDrawOrDispatchIndirect);
-
+		
 		reshade::register_event<reshade::addon_event::init_command_list>(onInitCommandList);
 		reshade::register_event<reshade::addon_event::destroy_command_list>(onDestroyCommandList);
 		reshade::register_event<reshade::addon_event::reset_command_list>(onResetCommandList);

@@ -1,5 +1,4 @@
 #include "dll_assembler.hpp"
-#include "crc32_hash.hpp"
 #include "dxcapi.h"
 #include "wrl.h"
 
@@ -31,7 +30,7 @@ vector<UINT8> ret;
 	return ret;
 }
 
-uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline, uint32_t crcVS) {
+uint32_t dumpShader(const wchar_t* type, const void* pData, size_t length, bool pipeline, uint32_t crcVS) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
 	FILE *f;
 	wchar_t sPath[MAX_PATH];
