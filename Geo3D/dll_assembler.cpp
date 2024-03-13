@@ -3319,6 +3319,10 @@ vector<UINT8> assembler(bool dx9, vector<UINT8> asmFile, vector<UINT8> buffer) {
 	if (dx9) {
 		LPD3DXBUFFER pAssemblyL = NULL;
 		D3DXAssembleShader((char*)asmFile.data(), (UINT)asmFile.size(), NULL, NULL, 0, &pAssemblyL, NULL);
+		if (pAssemblyL == NULL) {
+			vector<UINT8> error;
+			return error;
+		}
 		return readV(pAssemblyL->GetBufferPointer(), pAssemblyL->GetBufferSize());
 	}
 
