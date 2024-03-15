@@ -65,31 +65,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	string pathName;
 	vector<string> files;
 	FILE* f;
-	/*
-	{
-		auto ASM = readFile("ac2-vs.txt");
-		auto ASM2 = patch(true, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto ASM3 = changeASM(true, ASM2, true, gl_conv, gl_screenSize, gl_screenSize);
-		auto ASM4 = readFile("ac2-ps.txt");
-		auto ASM5 = patch(true, ASM, true, gl_conv, gl_screenSize, gl_separation);
-	}
 
-	{
-		auto ASM = readFile("bio-vs.txt");
-		auto ASM2 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto ASM3 = changeASM(false, ASM2, true, gl_conv, gl_screenSize, gl_screenSize);
-		auto ASM4 = readFile("bio-ps.txt");
-		auto ASM5 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-	}
-
-	{
-		auto ASM = readFile("SMR-vs.txt");
-		auto ASM2 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto ASM3 = changeASM(false, ASM2, true, gl_conv, gl_screenSize, gl_screenSize);
-		auto ASM4 = readFile("SMR-ps.txt");
-		auto ASM5 = patch(false, ASM, true, gl_conv, gl_screenSize, gl_separation);
-	}
-	*/
 	char gamebuffer[100000];	
 	InitializeCriticalSection(&gl_CS);
 	vector<string> lines;
@@ -111,7 +87,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		cout << gameName << endl;
 
 		pathName = gameName;
-		pathName.append("\\ShaderCache\\");
+		pathName.append("\\ShaderCacheGeo3D\\");
 		auto newFiles = enumerateFiles(pathName, "????????-??.bin");
 		//auto newFiles = enumerateFiles(pathName, "????????-??.txt");
 		files.insert(files.end(), newFiles.begin(), newFiles.end());
@@ -122,6 +98,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	for (int i = 0; i < files.size(); i++) {
 		string fileName = files[i];
 		auto BIN = readFile(fileName);
+		auto crc2 = fnv_64_buf(BIN.data(), BIN.size());
+		printf_s("%s-%016llX", fileName.c_str(), crc2);
+		cout << endl;
+		//s_stromgf
+		/*
 		ID3DBlob* pDissassembly;
 		LPCSTR error = nullptr;
 		HRESULT hr = D3DDisassemble(BIN.data(), BIN.size(), 0, error, &pDissassembly);
@@ -155,6 +136,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				fclose(f);
 			}
 		}
+		*/
 	}
 	cout << endl;
 	return 0;

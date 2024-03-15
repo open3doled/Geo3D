@@ -18,7 +18,6 @@
 #include "D3DX9Shader.h"
 #include <regex>
 #include <mutex>
-#include "crc32_hash.hpp"
 
 using namespace std;
 
@@ -42,7 +41,7 @@ struct token_operand
 	unsigned extended : 1;
 };
 
-vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float separation);
+vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenSize, float separation);
 vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float gl_separation);
 vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float separation);
 uint32_t dumpShader(const wchar_t* type, const void* pData, size_t length, bool pipeline = false, uint32_t crcVS = 0);

@@ -1,4 +1,5 @@
 #include "dll_assembler.hpp"
+#include "crc32_hash.hpp"
 #include "dxcapi.h"
 #include "wrl.h"
 
@@ -13,8 +14,8 @@ DWORD strToDWORD(string s);
 extern int gl_dumpBIN;
 extern int gl_dumpRAW;
 extern int gl_dumpASM;
-extern bool gl_DXIL_if;
 extern bool gl_zDepth;
+int screensize = 15;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -71,7 +72,7 @@ uint32_t dumpShader(const wchar_t* type, const void* pData, size_t length, bool 
 	return crc;
 }
 
-vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float separation) {
+vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenSize, float separation) {
 	int tempReg = 10;
 	vector<DWORD> newCode;
 	bool define = false;
@@ -101,7 +102,7 @@ vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float separat
 		}
 		if (!define) {
 			if (code[i] == 0x200001F) {
-				float finalSep = separation * 0.001f * 6.5f / (2.54f * 15 * 16 / sqrtf(256 + 81));
+				float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
 				// first declare
 				newCode.push_back(0x5000051);
 				newCode.push_back(0xA00F00FA);
@@ -281,7 +282,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 					for (size_t j = i + 1; j < lines.size(); j++) {
 						string d = lines[j];
 						if (d.find("def") == string::npos) {
-							float finalSep = separation * 0.001f * 6.5f / (2.54f * 15 * 16 / sqrtf(256 + 81));
+							float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
 							char buf[80];
 							sprintf_s(buf, 80, "%.6f", left ? finalSep : -finalSep);
 							string sepS(buf);
@@ -342,7 +343,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 				if (!stereoDone) {
 					stereoDone = true;
 					sReg = "r" + to_string(temp - 1) + ".xyzw";
-					float finalSep = separation * 0.001f * 6.5f / (2.54f * 15 * 16 / sqrtf(256 + 81));
+					float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
 					char buf[80];
 					sprintf_s(buf, 80, "%.6f", left ? -finalSep : finalSep);
 					string sep(buf);
@@ -365,7 +366,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 		return shaderOut;
 	}
 	else {
-		float finalSep = separation * 0.001f * 6.5f / (2.54f * 15 * 16 / sqrtf(256 + 81));
+		float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
 		double dConv = -conv;
 		DWORD64* pConv = (DWORD64*)&dConv;
 		double dSep = left ? finalSep : -finalSep;
@@ -466,11 +467,11 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float separat
 		// Go through the wilderness
 		vector<string> shader;
 		vector<string> shaderS;
-		bool bSmall = !gl_DXIL_if;
+		bool bSmall = true;
 		size_t sizeGap = 0;
 		size_t rowGap = 0;
 
-		float finalSep = separation * 0.001f * 6.5f / (2.54f * 15 * 16 / sqrtf(256 + 81));
+		float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
 		double dConv = -conv;
 		DWORD64* pConv = (DWORD64*)&dConv;
 		double dSep = left ? -finalSep : finalSep;
@@ -668,7 +669,7 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float separat
 				for (size_t j = i + 1; j < lines.size(); j++) {
 					string d = lines[j];
 					if (d.find("def") == string::npos) {
-						float finalSep = separation * 0.001f * 6.5f / (2.54f * 15 * 16 / sqrtf(256 + 81));
+						float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
 						char buf[80];
 						sprintf_s(buf, 80, "%.6f", left ? -finalSep : finalSep);
 						string sepS(buf);
@@ -733,7 +734,7 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 		else if (dcl == true) {
 			// after dcl
 			if (s.find("ret") < s.size()) {
-				float finalSep = separation * 0.001f * 6.5f / (2.54f * 15 * 16 / sqrtf(256 + 81));
+				float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
 				char buf[80];
 				sprintf_s(buf, 80, "%.6f", left ? -finalSep : finalSep);
 				string sep(buf);
