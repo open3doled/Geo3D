@@ -14,8 +14,8 @@ DWORD strToDWORD(string s);
 extern int gl_dumpBIN;
 extern int gl_dumpRAW;
 extern int gl_dumpASM;
+extern bool gl_DXIL_if;
 extern bool gl_zDepth;
-int screensize = 15;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -31,7 +31,7 @@ vector<UINT8> ret;
 	return ret;
 }
 
-uint32_t dumpShader(const wchar_t* type, const void* pData, size_t length, bool pipeline, uint32_t crcVS) {
+uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline, uint32_t crcVS) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
 	FILE *f;
 	wchar_t sPath[MAX_PATH];
@@ -263,7 +263,7 @@ vector<UINT8> asmShader(const void* pData, size_t length) {
 	}
 }
 
-vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float separation) {
+vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float screenSize, float separation) {
 	if (dx9) {
 		vector<UINT8> shaderOut;
 		auto lines = stringToLines((char*)shader.data(), shader.size());
@@ -282,7 +282,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 					for (size_t j = i + 1; j < lines.size(); j++) {
 						string d = lines[j];
 						if (d.find("def") == string::npos) {
-							float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
+							float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
 							char buf[80];
 							sprintf_s(buf, 80, "%.6f", left ? finalSep : -finalSep);
 							string sepS(buf);
@@ -343,7 +343,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 				if (!stereoDone) {
 					stereoDone = true;
 					sReg = "r" + to_string(temp - 1) + ".xyzw";
-					float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
+					float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
 					char buf[80];
 					sprintf_s(buf, 80, "%.6f", left ? -finalSep : finalSep);
 					string sep(buf);
@@ -366,7 +366,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 		return shaderOut;
 	}
 	else {
-		float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
+		float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
 		double dConv = -conv;
 		DWORD64* pConv = (DWORD64*)&dConv;
 		double dSep = left ? finalSep : -finalSep;
@@ -391,7 +391,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 	}
 }
 
-vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float separation) {
+vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	vector<UINT8> shaderOutput;
 	auto lines = stringToLines((char*)ASM.data(), ASM.size());
 
@@ -467,11 +467,11 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float separat
 		// Go through the wilderness
 		vector<string> shader;
 		vector<string> shaderS;
-		bool bSmall = true;
+		bool bSmall = !gl_DXIL_if;
 		size_t sizeGap = 0;
 		size_t rowGap = 0;
 
-		float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
+		float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
 		double dConv = -conv;
 		DWORD64* pConv = (DWORD64*)&dConv;
 		double dSep = left ? -finalSep : finalSep;
@@ -591,7 +591,7 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float separat
 	return shaderOutput;
 }
 
-vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float separation) {
+vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	vector<UINT8> shaderOut;
 	string reg((char*)ASM.data(), ASM.size());
 	int tempReg = 0;
@@ -669,7 +669,7 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float separat
 				for (size_t j = i + 1; j < lines.size(); j++) {
 					string d = lines[j];
 					if (d.find("def") == string::npos) {
-						float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
+						float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
 						char buf[80];
 						sprintf_s(buf, 80, "%.6f", left ? -finalSep : finalSep);
 						string sepS(buf);
@@ -688,11 +688,11 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float separat
 	return shaderOut;
 }
 
-vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float separation) {
+vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	if (ASM.size() > 0 && ASM[0] == ';')
-		return changeDXIL(ASM, left, conv, separation);
+		return changeDXIL(ASM, left, conv, screenSize, separation);
 	if (dx9)
-		return changeASM9(ASM, left, conv, separation);
+		return changeASM9(ASM, left, conv, screenSize, separation);
 
 	vector<UINT8> shaderOut;
 	auto lines = stringToLines((char*)ASM.data(), ASM.size());
@@ -734,7 +734,7 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 		else if (dcl == true) {
 			// after dcl
 			if (s.find("ret") < s.size()) {
-				float finalSep = separation * 0.001f * 6.5f / (2.54f * screensize * 16 / sqrtf(256 + 81));
+				float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
 				char buf[80];
 				sprintf_s(buf, 80, "%.6f", left ? -finalSep : finalSep);
 				string sep(buf);
@@ -3320,10 +3320,6 @@ vector<UINT8> assembler(bool dx9, vector<UINT8> asmFile, vector<UINT8> buffer) {
 	if (dx9) {
 		LPD3DXBUFFER pAssemblyL = NULL;
 		D3DXAssembleShader((char*)asmFile.data(), (UINT)asmFile.size(), NULL, NULL, 0, &pAssemblyL, NULL);
-		if (pAssemblyL == NULL) {
-			vector<UINT8> error;
-			return error;
-		}
 		return readV(pAssemblyL->GetBufferPointer(), pAssemblyL->GetBufferSize());
 	}
 
