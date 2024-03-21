@@ -14,7 +14,7 @@ int gl_dumpBIN = false;
 int gl_dumpOnly = false;
 int gl_dumpASM = false;
 bool gl_2D = false;
-bool gl_DXIL_if = false;
+bool gl_DXIL_if = true;
 bool gl_quickLoad = false;
 bool gl_zDepth = false;
 bool gl_initPipeline = false;
@@ -1054,7 +1054,7 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "DumpBIN", gl_dumpBIN);
 	reshade::get_config_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
 
-	reshade::get_config_value(nullptr, "Geo3D", "Edit", edit);
+	reshade::get_config_value(nullptr, "Geo3D", "DXIL_if", gl_DXIL_if);
 
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 
