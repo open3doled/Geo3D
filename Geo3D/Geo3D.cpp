@@ -7,9 +7,9 @@
 
 bool gl_left = false;
 
-float gl_conv = 1.0f;
-float gl_screenSize = 15.6f;
-float gl_separation = 80.0f;
+double gl_conv = 1.0f;
+float gl_screenSize = 16.0f;
+UINT8 gl_separation = 8;
 int gl_dumpBIN = false;
 int gl_dumpOnly = false;
 int gl_dumpASM = false;
@@ -24,8 +24,8 @@ std::filesystem::path fix_path;
 using namespace reshade::api;
 
 struct PSO {
-	float separation;
-	float convergence;
+	UINT8 separation;
+	double convergence;
 	vector<pipeline_subobject> objects;
 	pipeline_layout layout;
 
@@ -378,32 +378,61 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		else {
 			pso->vs->code = pso->vsS.code;
 			pso->vs->code_size = pso->vsS.code_size;
+
+			if (device->get_api() == device_api::d3d12) {
+				if (pso->dsS.code_size > 0) {
+					auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
+					auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+					if (test.size() > 0) {
+						DS_L = test;
+						DS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+					}
+					else {
+						pso->ds->code = pso->dsS.code;
+						pso->ds->code_size = pso->dsS.code_size;
+					}
+				}
+				else if (pso->gsS.code_size > 0) {
+
+					auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
+					auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+					if (test.size() > 0) {
+						GS_L = test;
+						GS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+					}
+					else {
+						pso->gs->code = pso->gsS.code;
+						pso->gs->code_size = pso->gsS.code_size;
+					}
+				}
+			}
 		}
 	}
+	if (device->get_api() != device_api::d3d12) {
+		if (pso->dsS.code_size > 0) {
+			auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
+			auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+			if (test.size() > 0) {
+				DS_L = test;
+				DS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			}
+			else {
+				pso->ds->code = pso->dsS.code;
+				pso->ds->code_size = pso->dsS.code_size;
+			}
+		}
 
-	if (pso->dsS.code_size > 0) {
-		auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		if (test.size() > 0) {
-			DS_L = test;
-			DS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-		}
-		else {
-			pso->ds->code = pso->dsS.code;
-			pso->ds->code_size = pso->dsS.code_size;
-		}
-	}
-
-	if (pso->gsS.code_size > 0) {
-		auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		if (test.size() > 0) {
-			GS_L = test;
-			GS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-		}
-		else {
-			pso->gs->code = pso->gsS.code;
-			pso->gs->code_size = pso->gsS.code_size;
+		if (pso->gsS.code_size > 0) {
+			auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
+			auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+			if (test.size() > 0) {
+				GS_L = test;
+				GS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			}
+			else {
+				pso->gs->code = pso->gsS.code;
+				pso->gs->code_size = pso->gsS.code_size;
+			}
 		}
 	}
 
@@ -453,7 +482,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		cGS_R = assembler(dx9, GS_R, gsV);
 	}
 
-	m.lock();
 	if (cVS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
@@ -505,7 +533,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
 		pso->Right = pipeR;
 	}
-	m.unlock();
 }
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
@@ -1013,6 +1040,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 			else {
 				gl_separation -= 5;
 			}
+			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 		if (runtime->is_key_pressed(VK_F4)) {
 			if (gl_separation == 1)
@@ -1032,18 +1060,17 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				if (gl_separation > 100)
 					gl_separation = 100;
 			}
+			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 		if (runtime->is_key_pressed(VK_F5)) {
-			gl_conv *= 0.9f;
-			if (gl_conv < 0.01f)
-				gl_conv = 0.01f;
+			gl_conv *= 0.8f;
+			if (gl_conv < 0.16777216f)
+				gl_conv = 0.16777216f;
+			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
 		}
 		if (runtime->is_key_pressed(VK_F6)) {
-			gl_conv *= 1.11f;
-		}
-		if (runtime->is_key_pressed(VK_F7)) {
+			gl_conv *= 1.25f;
 			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
-			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 	}
 }
@@ -1063,7 +1090,7 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "initPipeline", gl_initPipeline);	
 	
 	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
-	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
+	//reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
 	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 
 	WCHAR file_prefix[MAX_PATH] = L"";
@@ -1099,10 +1126,19 @@ static void onReshadeOverlay(reshade::api::effect_runtime* runtime)
 		bool dx9 = api == device_api::d3d9;
 		bool dx10 = api == device_api::d3d10;
 		bool dx11 = api == device_api::d3d11;
+		bool opengl = api == device_api::opengl;
+		bool vulkan = api == device_api::vulkan;
 		ImGui::Text("Geo3D: %s", gl_2D ? "2D Mode" : "3D Mode");
-		ImGui::Text("DirectX %s", dx9 ? "9" : dx10 ? "10" : dx11 ? "11" : "12");
-		ImGui::Text("Screensizen %.1f", gl_screenSize);
-		ImGui::Text("Separation %.0f", gl_separation);
+		if (opengl) {
+			ImGui::Text("OpenGL");
+		}
+		else if (vulkan) {
+			ImGui::Text("OVulkan");
+		}
+		else {
+			ImGui::Text("DirectX %s", dx9 ? "9" : dx10 ? "10" : dx11 ? "11" : "12");
+		}
+		ImGui::Text("Separation %d", gl_separation);
 		ImGui::Text("Convergence %.2f", gl_conv);
 
 		size_t maxPS = pixelShaders.size();
