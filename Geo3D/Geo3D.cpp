@@ -9,15 +9,17 @@ bool gl_left = false;
 
 float gl_conv = 1.0f;
 float gl_screenSize = 15.6f;
-float gl_separation = 80.0f;
+float gl_separation = 8.0f;
+
 int gl_dumpBIN = false;
 int gl_dumpOnly = false;
 int gl_dumpASM = false;
+
 bool gl_2D = false;
 bool gl_DXIL_if = true;
 bool gl_quickLoad = false;
 bool gl_zDepth = false;
-bool gl_initPipeline = false;
+bool gl_initPipeline = true;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
@@ -969,14 +971,8 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 			if (pso->crcCS == currentCS) {
 				filesystem::path file;
 				filesystem::create_directories(fix_path);
-				if (huntUsing2D) {
-					pso->noDraw = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
-				}
-				else {
-					pso->noDraw = true;
-					swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
-				}
+				pso->noDraw = true;
+				swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
 				file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
@@ -1013,6 +1009,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 			else {
 				gl_separation -= 5;
 			}
+			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 		if (runtime->is_key_pressed(VK_F4)) {
 			if (gl_separation == 1)
@@ -1029,21 +1026,18 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 				gl_separation = 10;
 			else {
 				gl_separation += 5;
-				if (gl_separation > 100)
-					gl_separation = 100;
 			}
+			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 		if (runtime->is_key_pressed(VK_F5)) {
 			gl_conv *= 0.9f;
-			if (gl_conv < 0.01f)
-				gl_conv = 0.01f;
+			if (gl_conv < 0.02f)
+				gl_conv = 0.02f;
+			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
 		}
 		if (runtime->is_key_pressed(VK_F6)) {
 			gl_conv *= 1.11f;
-		}
-		if (runtime->is_key_pressed(VK_F7)) {
 			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
-			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 		}
 	}
 }
@@ -1099,10 +1093,16 @@ static void onReshadeOverlay(reshade::api::effect_runtime* runtime)
 		bool dx9 = api == device_api::d3d9;
 		bool dx10 = api == device_api::d3d10;
 		bool dx11 = api == device_api::d3d11;
+		bool opengl = api == device_api::opengl;
+		bool vulkan = api == device_api::vulkan;
 		ImGui::Text("Geo3D: %s", gl_2D ? "2D Mode" : "3D Mode");
-		ImGui::Text("DirectX %s", dx9 ? "9" : dx10 ? "10" : dx11 ? "11" : "12");
-		ImGui::Text("Screensizen %.1f", gl_screenSize);
-		ImGui::Text("Separation %.0f", gl_separation);
+		if (opengl)
+			ImGui::Text("OpenGL");
+		else if (vulkan)
+			ImGui::Text("Vulkan");
+		else
+			ImGui::Text("DirectX %s", dx9 ? "9" : dx10 ? "10" : dx11 ? "11" : "12");
+		ImGui::Text("Separation %d", gl_separation);
 		ImGui::Text("Convergence %.2f", gl_conv);
 
 		size_t maxPS = pixelShaders.size();
@@ -1166,7 +1166,7 @@ static void onResetCommandList(command_list* commandList)
 
 static void onDestroyPipeline(device* device, reshade::api::pipeline pipelineHandle)
 {
-	//PSOmap.erase(pipelineHandle.handle);
+	PSOmap.erase(pipelineHandle.handle);
 }
 
 bool blockDrawCallForCommandList(command_list* commandList)
