@@ -1193,7 +1193,7 @@ static void onResetCommandList(command_list* commandList)
 
 static void onDestroyPipeline(device* device, reshade::api::pipeline pipelineHandle)
 {
-	PSOmap.erase(pipelineHandle.handle);
+	//PSOmap.erase(pipelineHandle.handle);
 }
 
 bool blockDrawCallForCommandList(command_list* commandList)
