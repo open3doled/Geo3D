@@ -72,7 +72,7 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool 
 	return crc;
 }
 
-vector<DWORD> changeSM2(vector<DWORD> code, bool left, double conv, float screenSize, float separation) {
+vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenSize, float separation) {
 	int tempReg = 10;
 	vector<DWORD> newCode;
 	bool define = false;
@@ -106,7 +106,7 @@ vector<DWORD> changeSM2(vector<DWORD> code, bool left, double conv, float screen
 				// first declare
 				newCode.push_back(0x5000051);
 				newCode.push_back(0xA00F00FA);
-				float fConv = (float)-conv;
+				float fConv = -conv;
 				float fSep = left ? -finalSep : finalSep;
 				DWORD *conv = (DWORD *)&fConv;
 				DWORD *sep = (DWORD *)&fSep;
@@ -263,7 +263,7 @@ vector<UINT8> asmShader(const void* pData, size_t length) {
 	}
 }
 
-vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, double conv, float screenSize, float separation) {
+vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float screenSize, float separation) {
 	if (dx9) {
 		vector<UINT8> shaderOut;
 		auto lines = stringToLines((char*)shader.data(), shader.size());
@@ -391,7 +391,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, double conv, floa
 	}
 }
 
-vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, double conv, float screenSize, float separation) {
+vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	vector<UINT8> shaderOutput;
 	auto lines = stringToLines((char*)ASM.data(), ASM.size());
 
@@ -591,7 +591,7 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, double conv, float screen
 	return shaderOutput;
 }
 
-vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, double conv, float screenSize, float separation) {
+vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	vector<UINT8> shaderOut;
 	string reg((char*)ASM.data(), ASM.size());
 	int tempReg = 0;
@@ -688,7 +688,7 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, double conv, float screen
 	return shaderOut;
 }
 
-vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, double conv, float screenSize, float separation) {
+vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
 	if (ASM.size() > 0 && ASM[0] == ';')
 		return changeDXIL(ASM, left, conv, screenSize, separation);
 	if (dx9)

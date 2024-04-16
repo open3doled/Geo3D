@@ -7,9 +7,9 @@
 
 bool gl_left = false;
 
-double gl_conv = 1.0f;
-float gl_screenSize = 16;
-UINT32 gl_separation = 8;
+float gl_conv = 1.0f;
+float gl_screenSize = 15.6f;
+float gl_separation = 8.0f;
 
 int gl_dumpBIN = false;
 int gl_dumpOnly = false;
@@ -26,8 +26,8 @@ std::filesystem::path fix_path;
 using namespace reshade::api;
 
 struct PSO {
-	UINT32 separation;
-	double convergence;
+	float separation;
+	float convergence;
 	vector<pipeline_subobject> objects;
 	pipeline_layout layout;
 
@@ -347,6 +347,7 @@ static void  enumerateFiles() {
 	}
 }
 
+mutex m;
 void updatePipeline(reshade::api::device* device, PSO* pso) {
 	vector<UINT8> ASM;
 	vector<UINT8> VS_L, VS_R, PS_L, PS_R, CS_L, CS_R;
@@ -379,62 +380,32 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		else {
 			pso->vs->code = pso->vsS.code;
 			pso->vs->code_size = pso->vsS.code_size;
-
-			if (device->get_api() == device_api::d3d12) {
-				if (pso->dsS.code_size > 0) {
-					auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
-					auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-					if (test.size() > 0) {
-						DS_L = test;
-						DS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-					}
-					else {
-						pso->ds->code = pso->dsS.code;
-						pso->ds->code_size = pso->dsS.code_size;
-					}
-				}
-				else if (pso->gsS.code_size > 0) {
-
-					auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
-					auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-					if (test.size() > 0) {
-						GS_L = test;
-						GS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-					}
-					else {
-						pso->gs->code = pso->gsS.code;
-						pso->gs->code_size = pso->gsS.code_size;
-					}
-				}
-			}
 		}
 	}
 
-	if (device->get_api() != device_api::d3d12) {
-		if (pso->dsS.code_size > 0) {
-			auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
-			auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-			if (test.size() > 0) {
-				DS_L = test;
-				DS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-			}
-			else {
-				pso->ds->code = pso->dsS.code;
-				pso->ds->code_size = pso->dsS.code_size;
-			}
+	if (pso->dsS.code_size > 0) {
+		auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
+		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		if (test.size() > 0) {
+			DS_L = test;
+			DS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 		}
+		else {
+			pso->ds->code = pso->dsS.code;
+			pso->ds->code_size = pso->dsS.code_size;
+		}
+	}
 
-		if (pso->gsS.code_size > 0) {
-			auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
-			auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-			if (test.size() > 0) {
-				GS_L = test;
-				GS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-			}
-			else {
-				pso->gs->code = pso->gsS.code;
-				pso->gs->code_size = pso->gsS.code_size;
-			}
+	if (pso->gsS.code_size > 0) {
+		auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
+		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		if (test.size() > 0) {
+			GS_L = test;
+			GS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+		}
+		else {
+			pso->gs->code = pso->gsS.code;
+			pso->gs->code_size = pso->gsS.code_size;
 		}
 	}
 
@@ -484,6 +455,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		cGS_R = assembler(dx9, GS_R, gsV);
 	}
 
+	m.lock();
 	if (cVS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
@@ -535,6 +507,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
 		pso->Right = pipeR;
 	}
+	m.unlock();
 }
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
@@ -735,7 +708,7 @@ static void onPresent(command_queue* queue, swapchain* swapchain, const rect* so
 static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
 	/*
-	auto var = runtime->find_uniform_variable("3DToElse.fx", "framecount");
+	auto var = runtime->find_uniform_variable(nullptr, "framecount");
 	unsigned int framecountElse = 0;
 	runtime->get_uniform_value_uint(var, &framecountElse, 1);
 	if (framecountElse > 0)
@@ -1088,7 +1061,7 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "initPipeline", gl_initPipeline);	
 	
 	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
-	//reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
+	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
 	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 
 	WCHAR file_prefix[MAX_PATH] = L"";
@@ -1197,7 +1170,7 @@ static void onResetCommandList(command_list* commandList)
 
 static void onDestroyPipeline(device* device, reshade::api::pipeline pipelineHandle)
 {
-	//PSOmap.erase(pipelineHandle.handle);
+	PSOmap.erase(pipelineHandle.handle);
 }
 
 bool blockDrawCallForCommandList(command_list* commandList)
