@@ -742,6 +742,10 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		gl_left = (framecountElse % 2) == 0;
 	*/
 
+	if (runtime->is_key_pressed(VK_F8)) {
+		gl_left = !gl_left;
+	}
+
 	if (runtime->is_key_pressed(VK_NUMPAD0)) {
 		if (edit)
 			huntUsing2D = true;
