@@ -1106,7 +1106,7 @@ static void onReshadeOverlay(reshade::api::effect_runtime* runtime)
 			ImGui::Text("Vulkan");
 		else
 			ImGui::Text("DirectX %s", dx9 ? "9" : dx10 ? "10" : dx11 ? "11" : "12");
-		ImGui::Text("Separation %d", gl_separation);
+		ImGui::Text("Separation %0.1f", gl_separation);
 		ImGui::Text("Convergence %.3f", gl_conv);
 
 		size_t maxPS = pixelShaders.size();
