@@ -17,13 +17,15 @@ int gl_dumpASM = false;
 
 bool gl_2D = false;
 bool gl_DXIL_if = true;
-bool gl_quickLoad = false;
+bool gl_quickLoad = true;
 bool gl_zDepth = false;
 bool gl_initPipeline = true;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
 using namespace reshade::api;
+
+static void load_config();
 
 struct PSO {
 	float separation;
@@ -661,9 +663,11 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 			}
 		}
 
-		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = 1;
-		if (pso->crcVS != 0) vertexShaders[pso->crcVS] = 1;
-		if (pso->crcCS != 0) computeShaders[pso->crcCS] = 1;
+		if (edit) {
+			if (pso->crcPS != 0) pixelShaders[pso->crcPS] = 1;
+			if (pso->crcVS != 0) vertexShaders[pso->crcVS] = 1;
+			if (pso->crcCS != 0) computeShaders[pso->crcCS] = 1;
+		}
 		
 		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
 			commandListData.PS = pso->crcPS ? pso->crcPS : -1;
@@ -720,11 +724,12 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	}
 
 	if (runtime->is_key_pressed(VK_NUMPAD0)) {
-		if (edit)
-			huntUsing2D = true;
-
 		edit = !edit;
 		if (!edit) {
+			vertexShaders.clear();
+			pixelShaders.clear();
+			computeShaders.clear();
+
 			currentVS = 0;
 			currentPS = 0;
 			currentCS = 0;
@@ -736,7 +741,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	FILE* f;
 	wchar_t sPath[MAX_PATH];
 	if (runtime->is_key_pressed(VK_F10)) {
-		enumerateFiles();
+		load_config();
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
 			PSO* pso = &it->second;
 			pso->skip = false;
@@ -802,19 +807,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		filesystem::create_directories(fix_path_dump);
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
 			PSO* pso = &it->second;
-			if (runtime->is_key_down(VK_CONTROL) && runtime->is_key_down(VK_MENU)) {
-				if (computeShaders.count(pso->crcCS) == 1) {
-					swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcPS);
-					filesystem::path file = fix_path_dump / sPath;
-					_wfopen_s(&f, file.c_str(), L"wb");
-					if (f != 0) {
-						auto ASM = asmShader(pso->csS.code, pso->csS.code_size);
-						fwrite(ASM.data(), 1, ASM.size(), f);
-						fclose(f);
-					}
-				}
-			}
-			else if (runtime->is_key_down(VK_CONTROL)) {
+			if (runtime->is_key_down(VK_CONTROL)) {
 				if (vertexShaders.count(pso->crcVS) == 1) {
 					swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
 					filesystem::path file = fix_path_dump / sPath;
@@ -975,8 +968,14 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 			if (pso->crcCS == currentCS) {
 				filesystem::path file;
 				filesystem::create_directories(fix_path);
-				pso->noDraw = true;
-				swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
+				if (huntUsing2D) {
+					pso->skip = true;
+					swprintf_s(sPath, MAX_PATH, L"%08lX-cs.skip", pso->crcCS);
+				}
+				else {
+					pso->noDraw = true;
+					swprintf_s(sPath, MAX_PATH, L"%08lX-cs.dump", pso->crcCS);
+				}
 				file = fix_path / sPath;
 				_wfopen_s(&f, file.c_str(), L"wb");
 				if (f != 0) {
@@ -989,59 +988,8 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	}
 
 	if (runtime->is_key_down(VK_CONTROL)) {
-		if (runtime->is_key_pressed(VK_F1)) {
-			gl_quickLoad = false;
-		}
-		if (runtime->is_key_pressed(VK_F2)) {
+		if (runtime->is_key_pressed(0x54)) { // T key
 			gl_2D = !gl_2D;
-		}
-		if (runtime->is_key_pressed(VK_F3)) {
-			if (gl_separation == 10)
-				gl_separation = 8;
-			else if (gl_separation == 8)
-				gl_separation = 6;
-			else if (gl_separation == 6)
-				gl_separation = 4;
-			else if (gl_separation == 4)
-				gl_separation = 3;
-			else if (gl_separation == 3)
-				gl_separation = 2;
-			else if (gl_separation == 2)
-				gl_separation = 1;
-			else if (gl_separation == 1)
-				gl_separation = 1;
-			else {
-				gl_separation -= 5;
-			}
-			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
-		}
-		if (runtime->is_key_pressed(VK_F4)) {
-			if (gl_separation == 1)
-				gl_separation = 2;
-			else if (gl_separation == 2)
-				gl_separation = 3;
-			else if (gl_separation == 3)
-				gl_separation = 4;
-			else if (gl_separation == 4)
-				gl_separation = 6;
-			else if (gl_separation == 6)
-				gl_separation = 8;
-			else if (gl_separation == 8)
-				gl_separation = 10;
-			else {
-				gl_separation += 5;
-			}
-			reshade::set_config_value(nullptr, "Geo3D", "Separation", gl_separation);
-		}
-		if (runtime->is_key_pressed(VK_F5)) {
-			gl_conv *= 0.9f;
-			if (gl_conv < 0.02f)
-				gl_conv = 0.02f;
-			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
-		}
-		if (runtime->is_key_pressed(VK_F6)) {
-			gl_conv *= 1.11f;
-			reshade::set_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
 		}
 	}
 }
@@ -1053,14 +1001,11 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
 
 	reshade::get_config_value(nullptr, "Geo3D", "DXIL_if", gl_DXIL_if);
-
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
-
 	reshade::get_config_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
-
 	reshade::get_config_value(nullptr, "Geo3D", "initPipeline", gl_initPipeline);	
 	
-	reshade::get_config_value(nullptr, "Geo3D", "Convergence", gl_conv);
+	reshade::get_config_value(nullptr, "Geo3D", "ScreenConvergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
 	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
 
