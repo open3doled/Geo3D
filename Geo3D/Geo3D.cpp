@@ -991,6 +991,14 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		if (runtime->is_key_pressed(0x54)) { // T key
 			gl_2D = !gl_2D;
 		}
+		if (runtime->is_key_pressed(VK_F5)) {
+			gl_conv *= 0.8f;
+			reshade::set_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
+		}
+		if (runtime->is_key_pressed(VK_F6)) {
+			gl_conv *= 1.25f;
+			reshade::set_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
+		}
 	}
 }
 
@@ -1005,9 +1013,9 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
 	reshade::get_config_value(nullptr, "Geo3D", "initPipeline", gl_initPipeline);	
 	
-	reshade::get_config_value(nullptr, "Geo3D", "ScreenConvergence", gl_conv);
-	reshade::get_config_value(nullptr, "Geo3D", "ScreenSize", gl_screenSize);
-	reshade::get_config_value(nullptr, "Geo3D", "Separation", gl_separation);
+	reshade::get_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
+	reshade::get_config_value(nullptr, "Geo3D", "StereoScreenSize", gl_screenSize);
+	reshade::get_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
 
 	WCHAR file_prefix[MAX_PATH] = L"";
 	GetModuleFileNameW(nullptr, file_prefix, ARRAYSIZE(file_prefix));
