@@ -360,16 +360,14 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
-		auto L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		auto test = changeASM(dx9, L, true, gl_conv, gl_screenSize, gl_separation);
+		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
 		if (test.size() == 0) {
-			VS_L = L;
-			VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			VS_L = ASM;
+			VS_R = ASM;
 		}
 		else {
 			VS_L = test;
-			VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
-			VS_R = changeASM(dx9, VS_R, false, gl_conv, gl_screenSize, gl_separation);
+			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 		}
 	}
 	else if (pso->vsS.code_size > 0) {
@@ -413,8 +411,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->psEdit.size() > 0) {
 		ASM = pso->psEdit;
-		PS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		PS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+		PS_L = ASM;
+		PS_R = ASM;
 	}
 	else if (pso->psS.code_size > 0) {
 		pso->ps->code = pso->psS.code;
@@ -423,8 +421,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->csEdit.size() > 0) {
 		ASM = pso->csEdit;
-		CS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		CS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+		CS_L = ASM;
+		CS_R = ASM;
 	}
 	else if (pso->csS.code_size > 0) {
 		pso->cs->code = pso->csS.code;
