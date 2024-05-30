@@ -16,10 +16,7 @@ int gl_dumpOnly = false;
 int gl_dumpASM = false;
 
 bool gl_2D = false;
-bool gl_DXIL_if = true;
 bool gl_quickLoad = true;
-bool gl_zDepth = false;
-bool gl_initPipeline = true;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
@@ -512,10 +509,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
 {
-	if (gl_initPipeline) {
-		if (PSOmap.count(pipeline.handle) == 1)
-			return;
-	}
+	if (PSOmap.count(pipeline.handle) == 1)
+		return;
 
 	shader_desc* vs = nullptr;
 	shader_desc* ps = nullptr;
@@ -1006,10 +1001,7 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "DumpBIN", gl_dumpBIN);
 	reshade::get_config_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
 
-	reshade::get_config_value(nullptr, "Geo3D", "DXIL_if", gl_DXIL_if);
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
-	reshade::get_config_value(nullptr, "Geo3D", "zDepth", gl_zDepth);
-	reshade::get_config_value(nullptr, "Geo3D", "initPipeline", gl_initPipeline);	
 	
 	reshade::get_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "StereoScreenSize", gl_screenSize);

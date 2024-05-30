@@ -12,10 +12,7 @@ vector<DWORD> assembleIns(string s);
 DWORD strToDWORD(string s);
 
 extern int gl_dumpBIN;
-extern int gl_dumpRAW;
 extern int gl_dumpASM;
-extern bool gl_DXIL_if;
-extern bool gl_zDepth;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -467,7 +464,6 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		// Go through the wilderness
 		vector<string> shader;
 		vector<string> shaderS;
-		bool bSmall = !gl_DXIL_if;
 		size_t sizeGap = 0;
 		size_t rowGap = 0;
 
@@ -482,51 +478,36 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		sprintf_s(buf, 80, "0x%016llX", *pConv);
 		string convS(buf);
 
-		if (bSmall) {
-			if (gl_zDepth) {
-				shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sZ + ", " + convS);
-				shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
-				shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
+		// find label or main
+		string startNumber = "0";
+		for (size_t j = filePos; j > 0; j--) {
+			if (lines[j].find("main") != string::npos) {
+				break;
 			}
-			else {
-				shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
-				shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
-				shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
+			if (lines[j].find("<label>:") != string::npos) {
+				startNumber = lines[j].substr(10);
+				if (startNumber.find(" ") < startNumber.size())
+					startNumber = startNumber.substr(0, startNumber.find(" "));
+				break;
 			}
-			sizeGap = 3;
-			rowGap = 3;
 		}
-		else {
-			// find label or main
-			string startNumber = "0";
-			for (size_t j = filePos; j > 0; j--) {
-				if (lines[j].find("main") != string::npos) {
-					break;
-				}
-				if (lines[j].find("<label>:") != string::npos) {
-					startNumber = lines[j].substr(10);
-					if (startNumber.find(" ") < startNumber.size())
-						startNumber = startNumber.substr(0, startNumber.find(" "));
-					break;
-				}
-			}
 
-			shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sX + ", 0.000000e+00");
-			shaderS.push_back("  %" + to_string(lastValue + 2) + " = fcmp fast une float " + sW + ", 1.000000e+00");
-			shaderS.push_back("  br i1 %" + to_string(lastValue + 2) + ", label %" + to_string(lastValue + 3) + ", label %" + to_string(lastValue + 7));
-			shaderS.push_back("");
-			shaderS.push_back("; <label>:" + to_string(lastValue + 3));
-			shaderS.push_back("  %" + to_string(lastValue + 4) + " = fadd fast float " + sW + ", " + convS);
-			shaderS.push_back("  %" + to_string(lastValue + 5) + " = fmul fast float %" + to_string(lastValue + 4) + ", " + sepS);
-			shaderS.push_back("  %" + to_string(lastValue + 6) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 5));
-			shaderS.push_back("  br label %" + to_string(lastValue + 7));
-			shaderS.push_back("");
-			shaderS.push_back("; <label>:" + to_string(lastValue + 7));
-			shaderS.push_back("  %" + to_string(lastValue + 8) + " = phi float [ %" +
-				to_string(lastValue + 6) + ", %" + to_string(lastValue + 3) + " ], [ %" + to_string(lastValue + 1) + ", %" + startNumber + " ]");
-			sizeGap = 8;
-			rowGap = 12;
-		}
+		shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sX + ", 0.000000e+00");
+		shaderS.push_back("  %" + to_string(lastValue + 2) + " = fcmp fast une float " + sW + ", 1.000000e+00");
+		shaderS.push_back("  br i1 %" + to_string(lastValue + 2) + ", label %" + to_string(lastValue + 3) + ", label %" + to_string(lastValue + 7));
+		shaderS.push_back("");
+		shaderS.push_back("; <label>:" + to_string(lastValue + 3));
+		shaderS.push_back("  %" + to_string(lastValue + 4) + " = fadd fast float " + sW + ", " + convS);
+		shaderS.push_back("  %" + to_string(lastValue + 5) + " = fmul fast float %" + to_string(lastValue + 4) + ", " + sepS);
+		shaderS.push_back("  %" + to_string(lastValue + 6) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 5));
+		shaderS.push_back("  br label %" + to_string(lastValue + 7));
+		shaderS.push_back("");
+		shaderS.push_back("; <label>:" + to_string(lastValue + 7));
+		shaderS.push_back("  %" + to_string(lastValue + 8) + " = phi float [ %" +
+			to_string(lastValue + 6) + ", %" + to_string(lastValue + 3) + " ], [ %" + to_string(lastValue + 1) + ", %" + startNumber + " ]");
+		sizeGap = 8;
+		rowGap = 12;
+
 		for (size_t i = 0; i < lines.size(); i++) {
 			string s = lines[i];
 			string s2;
@@ -646,20 +627,11 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenS
 				string sourceReg = "r" + to_string(tempReg);
 				string calcReg = "r" + to_string(tempReg + 1);
 
-				if (gl_zDepth) {
-					shader +=
-						//"    if_ne " + sourceReg + ".z, c250.z\n" +
-						"      add " + calcReg + ".x, " + sourceReg + ".z, c250.x\n" +
-						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n";
-						//"    endif\n";
-				}
-				else {
-					shader +=
-						//"    if_ne " + sourceReg + ".w, c250.z\n" +
+				shader +=
+						"    if_ne " + sourceReg + ".w, c250.z\n" +
 						"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
-						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n";
-						//"    endif\n";
-				}
+						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n" +
+						"    endif\n";
 			}
 		}
 		else {
@@ -744,22 +716,12 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				string sourceReg = "r" + to_string(temp - 1);
 				string calcReg = "r" + to_string(temp - 2);
 
-				if (gl_zDepth) {
-					shader +=
-						//"ne " + calcReg + ".x, " + sourceReg + ".z, l(1.000000)\n" +
-						//"if_nz " + calcReg + ".x\n"
-						"  add " + calcReg + ".x, " + sourceReg + ".z, l(" + conv + ")\n" +
-						"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
-						//"endif\n";
-				}
-				else {
-					shader +=
-						"ne " + calcReg + ".x, " + sourceReg + ".w, l(1.000000)\n" +
-						"if_nz " + calcReg + ".x\n" +
-						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-						"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
-						"endif\n";
-				}
+				shader +=
+					"ne " + calcReg + ".x, " + sourceReg + ".w, l(1.000000)\n" +
+					"if_nz " + calcReg + ".x\n" +
+					"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+					"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
+					"endif\n";
 			}
 			if (oReg.size() == 0) {
 				// no output
