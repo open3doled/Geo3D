@@ -357,14 +357,14 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		if (test.size() == 0) {
-			VS_L = ASM;
-			VS_R = ASM;
-		}
-		else {
+
+		VS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+		
+		auto test = changeASM(dx9, VS_L, true, gl_conv, gl_screenSize, gl_separation);
+		if (test.size() > 0) {
 			VS_L = test;
-			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			VS_R = changeASM(dx9, VS_R, false, gl_conv, gl_screenSize, gl_separation);
 		}
 	}
 	else if (pso->vsS.code_size > 0) {

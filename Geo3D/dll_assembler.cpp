@@ -286,7 +286,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 							sprintf_s(buf, 80, "%.3f", conv);
 							string convS(buf);
 							string signS = left ? "1" : "-1";
-							shader += "    def c250, " + convS + ", " + sepS + ", " + signS + ", 0\n";
+							shader += "    def c249, " + convS + ", " + sepS + ", " + signS + ", 0\n";
 							i = j - 1;
 							break;
 						}
@@ -348,7 +348,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 					string conv(buf);
 					string side = left ? "1" : "-1";
 
-					shader += "mov " + sReg + "l(" + sep + ", " + conv + ", " + side + ", 0)";
+					shader += "mov " + sReg + " l(" + sep + ", " + conv + ", " + side + ", 0)";
 				}
 				shader += s + "\n";
 			}
@@ -358,7 +358,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 			}
 		}
 		regex stereo("stereo");
-		shader = regex_replace(shader, stereo, "sReg");
+		shader = regex_replace(shader, stereo, "r" + to_string(temp - 1));
 		shaderOut = readV(shader.data(), shader.size());
 		return shaderOut;
 	}
