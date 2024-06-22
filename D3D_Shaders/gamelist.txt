@@ -1,4 +1,1 @@
-;s:\SteamLibrary\steamapps\common\Ace Combat Assault Horizon
-;u:\SteamLibrary\steamapps\common\The Ball\Binaries\Win32
-;t:\SteamLibrary\steamapps\common\Awesome
-;G:\EA\FIFA 22
+c:\Program Files (x86)\Steam\steamapps\common\ForzaHorizon4

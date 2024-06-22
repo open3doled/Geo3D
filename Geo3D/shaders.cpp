@@ -7,8 +7,8 @@
 
 CRITICAL_SECTION gl_CS;
 
-int gl_dumpBIN = false;
-int gl_dumpASM = false;
+bool gl_dumpBIN = false;
+bool gl_dumpASM = false;
 float gl_separation = 0.1f;
 float gl_screenSize = 55;
 float gl_conv = 1.0;
@@ -95,9 +95,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	for (int i = 0; i < files.size(); i++) {
 		string fileName = files[i];
 		auto BIN = readFile(fileName);
-		auto crc2 = fnv_64_buf(BIN.data(), BIN.size());
-		printf_s("%s-%016llX", fileName.c_str(), crc2);
-		cout << endl;
+		auto ASM = asmShader(BIN.data(), BIN.size());
+		auto newBin = assembler(false, ASM, BIN);
+		//auto crc2 = fnv_64_buf(BIN.data(), BIN.size());
+		//printf_s("%s-%016llX", fileName.c_str(), crc2);
+		//cout << endl;
 		//s_stromgf
 		/*
 		ID3DBlob* pDissassembly;

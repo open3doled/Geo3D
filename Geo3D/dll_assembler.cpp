@@ -11,8 +11,8 @@ FILE *failFile = NULL;
 vector<DWORD> assembleIns(string s);
 DWORD strToDWORD(string s);
 
-extern int gl_dumpBIN;
-extern int gl_dumpASM;
+extern bool gl_dumpBIN;
+extern bool gl_dumpASM;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -28,12 +28,11 @@ vector<UINT8> ret;
 	return ret;
 }
 
-uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline, uint32_t crcVS) {
+uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
 	FILE *f;
 	wchar_t sPath[MAX_PATH];
-	if (length > 0) {
-		if (gl_dumpBIN) {
+	if (gl_dumpBIN) {
 			filesystem::path file;
 			filesystem::create_directories(dump_path);
 			swprintf_s(sPath, MAX_PATH, L"%08lX-%s.bin", crc, type);
@@ -44,26 +43,16 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool 
 				fclose(f);
 			}
 		}
-		if (gl_dumpASM) {
-			auto ASM = asmShader(pData, length);
-			filesystem::path file;
-			if (pipeline) {
-				swprintf_s(sPath, MAX_PATH, L"%08lX", crcVS);
-				auto pipeline_path = dump_path / sPath;
-				filesystem::create_directories(pipeline_path);
-				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-				file = pipeline_path / sPath;
-			}
-			else {
-				filesystem::create_directories(dump_path);
-				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-				file = dump_path / sPath;
-			}
-			_wfopen_s(&f, file.c_str(), L"wb");
-			if (f != 0) {
-				fwrite(ASM.data(), 1, ASM.size(), f);
-				fclose(f);
-			}
+	if (gl_dumpASM) {
+		auto ASM = asmShader(pData, length);
+		filesystem::path file;
+		filesystem::create_directories(dump_path);
+		swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
+		file = dump_path / sPath;
+		_wfopen_s(&f, file.c_str(), L"wb");
+		if (f != 0) {
+			fwrite(ASM.data(), 1, ASM.size(), f);
+			fclose(f);
 		}
 	}
 	return crc;
