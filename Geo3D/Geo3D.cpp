@@ -8,12 +8,12 @@
 bool gl_left = false;
 
 float gl_conv = 1.0f;
-float gl_screenSize = 15.6f;
-float gl_separation = 8.0f;
+float gl_screenSize =27.0f;
+uint8_t gl_separation = 14;
 
-int gl_dumpBIN = false;
-int gl_dumpOnly = false;
-int gl_dumpASM = false;
+bool gl_dumpBIN = false;
+bool gl_dumpOnly = false;
+bool gl_dumpASM = false;
 
 bool gl_2D = false;
 bool gl_quickLoad = true;
@@ -25,7 +25,7 @@ using namespace reshade::api;
 static void load_config();
 
 struct PSO {
-	float separation;
+	uint8_t separation;
 	float convergence;
 	vector<pipeline_subobject> objects;
 	pipeline_layout layout;
@@ -379,7 +379,7 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 			pso->vs->code_size = pso->vsS.code_size;
 		}
 	}
-
+	
 	if (pso->dsS.code_size > 0) {
 		auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
 		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
@@ -392,7 +392,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 			pso->ds->code_size = pso->dsS.code_size;
 		}
 	}
-
 	if (pso->gsS.code_size > 0) {
 		auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
 		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
@@ -408,8 +407,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->psEdit.size() > 0) {
 		ASM = pso->psEdit;
-		PS_L = ASM;
-		PS_R = ASM;
+		PS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		PS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 	}
 	else if (pso->psS.code_size > 0) {
 		pso->ps->code = pso->psS.code;
@@ -418,8 +417,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->csEdit.size() > 0) {
 		ASM = pso->csEdit;
-		CS_L = ASM;
-		CS_R = ASM;
+		CS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		CS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
 	}
 	else if (pso->csS.code_size > 0) {
 		pso->cs->code = pso->csS.code;
@@ -452,7 +451,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		cGS_R = assembler(dx9, GS_R, gsV);
 	}
 
-	m.lock();
 	if (cVS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
@@ -504,7 +502,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
 		pso->Right = pipeR;
 	}
-	m.unlock();
 }
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
@@ -984,6 +981,29 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		if (runtime->is_key_pressed(0x54)) { // T key
 			gl_2D = !gl_2D;
 		}
+
+		if (runtime->is_key_pressed(VK_F3)) {
+			if (gl_separation < 20)
+				gl_separation -= 1;
+			else
+				gl_separation -= 5;
+
+			if (gl_separation < 1)
+				gl_separation = 1;
+			reshade::set_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
+		}
+
+		if (runtime->is_key_pressed(VK_F4)) {
+			if (gl_separation < 20)
+				gl_separation += 1;
+			else
+				gl_separation += 5;
+
+			if (gl_separation > 100)
+				gl_separation = 100;
+			reshade::set_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
+		}
+
 		if (runtime->is_key_pressed(VK_F5)) {
 			gl_conv *= 0.8f;
 			reshade::set_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
@@ -1004,18 +1024,15 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 	
 	reshade::get_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
-	reshade::get_config_value(nullptr, "Geo3D", "StereoScreenSize", gl_screenSize);
 	reshade::get_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
-
-	WCHAR file_prefix[MAX_PATH] = L"";
-	GetModuleFileNameW(nullptr, file_prefix, ARRAYSIZE(file_prefix));
-
-	std::filesystem::path game_file_path = file_prefix;
-	dump_path = game_file_path.parent_path();
-	fix_path = dump_path / L"ShaderFixesGeo3D";
-	dump_path /= L"ShaderCacheGeo3D";
-	enumerateFiles();
-
+	if (gl_separation > 100) {
+		gl_separation = 100;
+		reshade::set_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
+	}
+	if (gl_separation < 1) {
+		gl_separation = 1;
+		reshade::set_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
+	}
 	bool debug = false;
 	reshade::get_config_value(nullptr, "Geo3D", "Debug", debug);
 	if (debug) {
@@ -1023,6 +1040,8 @@ static void load_config()
 			Sleep(250);
 		} while (!IsDebuggerPresent());
 	}
+
+	enumerateFiles();
 }
 
 static void onReshadeOverlay(reshade::api::effect_runtime* runtime)
@@ -1162,6 +1181,8 @@ extern "C" __declspec(dllexport) const char* DESCRIPTION = "DirectX Stereoscopic
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD fdwReason, LPVOID)
 {
+	fix_path = L"ShaderFixesGeo3D";
+	dump_path = L"ShaderCacheGeo3D";
 	switch (fdwReason)
 	{
 	case DLL_PROCESS_ATTACH:
