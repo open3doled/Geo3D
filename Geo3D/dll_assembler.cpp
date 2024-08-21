@@ -12,6 +12,8 @@ FILE *failFile = NULL;
 vector<DWORD> assembleIns(string s);
 DWORD strToDWORD(string s);
 
+extern float gl_minConv;
+
 extern bool gl_dumpBIN;
 extern bool gl_dumpASM;
 
@@ -31,9 +33,10 @@ vector<UINT8> ret;
 
 uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
-	FILE *f;
-	wchar_t sPath[MAX_PATH];
-	if (gl_dumpBIN) {
+	if (crc != 0) {
+		FILE* f;
+		wchar_t sPath[MAX_PATH];
+		if (gl_dumpBIN) {
 			filesystem::path file;
 			filesystem::create_directories(dump_path);
 			swprintf_s(sPath, MAX_PATH, L"%08lX-%s.bin", crc, type);
@@ -44,16 +47,17 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length) {
 				fclose(f);
 			}
 		}
-	if (gl_dumpASM) {
-		auto ASM = asmShader(pData, length);
-		filesystem::path file;
-		filesystem::create_directories(dump_path);
-		swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-		file = dump_path / sPath;
-		_wfopen_s(&f, file.c_str(), L"wb");
-		if (f != 0) {
-			fwrite(ASM.data(), 1, ASM.size(), f);
-			fclose(f);
+		if (gl_dumpASM) {
+			auto ASM = asmShader(pData, length);
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(ASM.data(), 1, ASM.size(), f);
+				fclose(f);
+			}
 		}
 	}
 	return crc;
@@ -660,6 +664,7 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				dcl_ICB = true;
 				shader += s + "\n";
 			}
+
 			else {
 				shader += s + "\n";
 			}
@@ -680,9 +685,30 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				string sourceReg = "r" + to_string(temp - 1);
 				string calcReg = "r" + to_string(temp - 2);
 
-				shader +=
-					"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-					"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+				if (gl_minConv > 0) {
+					sprintf_s(buf, 80, "%.3f", -gl_minConv);
+					string convMin(buf);
+
+					sprintf_s(buf, 80, "%.3f", -gl_minConv * 2);
+					string convMin2(buf);
+
+					shader +=
+						//"if_ne " + sourceReg + ".w, l(1.000000)\n"
+						"if_lt " + sourceReg + ".w, l(" + convMin2 + ")\n"
+						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + convMin + ")\n" +
+						"else\n" +
+						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"endif\n" +
+						"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+						//"endif\n";
+				}
+				else {
+					shader +=
+						//"if_ne " + sourceReg + ".w, l(1.000000)\n"
+						"add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+						//"endif\n";
+				}
 			}
 			if (oReg.size() == 0) {
 				// no output
