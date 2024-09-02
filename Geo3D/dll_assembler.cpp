@@ -2,6 +2,7 @@
 #include "crc32_hash.hpp"
 #include "dxcapi.h"
 #include "wrl.h"
+#pragma comment(lib, "urlmon.lib")
 
 
 using Microsoft::WRL::ComPtr;
@@ -11,8 +12,10 @@ FILE *failFile = NULL;
 vector<DWORD> assembleIns(string s);
 DWORD strToDWORD(string s);
 
-extern int gl_dumpBIN;
-extern int gl_dumpASM;
+extern float gl_minConv;
+
+extern bool gl_dumpBIN;
+extern bool gl_dumpASM;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -28,11 +31,11 @@ vector<UINT8> ret;
 	return ret;
 }
 
-uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline, uint32_t crcVS) {
+uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
-	FILE *f;
-	wchar_t sPath[MAX_PATH];
-	if (length > 0) {
+	if (crc != 0) {
+		FILE* f;
+		wchar_t sPath[MAX_PATH];
 		if (gl_dumpBIN) {
 			filesystem::path file;
 			filesystem::create_directories(dump_path);
@@ -47,18 +50,9 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool 
 		if (gl_dumpASM) {
 			auto ASM = asmShader(pData, length);
 			filesystem::path file;
-			if (pipeline) {
-				swprintf_s(sPath, MAX_PATH, L"%08lX", crcVS);
-				auto pipeline_path = dump_path / sPath;
-				filesystem::create_directories(pipeline_path);
-				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-				file = pipeline_path / sPath;
-			}
-			else {
-				filesystem::create_directories(dump_path);
-				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-				file = dump_path / sPath;
-			}
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
+			file = dump_path / sPath;
 			_wfopen_s(&f, file.c_str(), L"wb");
 			if (f != 0) {
 				fwrite(ASM.data(), 1, ASM.size(), f);
@@ -69,7 +63,7 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool 
 	return crc;
 }
 
-vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenSize, float separation) {
+vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenSize, uint8_t separation) {
 	int tempReg = 10;
 	vector<DWORD> newCode;
 	bool define = false;
@@ -269,7 +263,7 @@ vector<UINT8> asmShader(const void* pData, size_t length) {
 	}
 }
 
-vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float screenSize, float separation) {
+vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float screenSize, uint8_t separation) {
 	if (dx9) {
 		vector<UINT8> shaderOut;
 		auto lines = stringToLines((char*)shader.data(), shader.size());
@@ -397,7 +391,7 @@ vector<UINT8> patch(bool dx9, vector<UINT8> shader, bool left, float conv, float
 	}
 }
 
-vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
+vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenSize, uint8_t separation) {
 	vector<UINT8> shaderOutput;
 	auto lines = stringToLines((char*)ASM.data(), ASM.size());
 
@@ -486,37 +480,13 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		string sepS(buf);
 		sprintf_s(buf, 80, "0x%016llX", *pConv);
 		string convS(buf);
-
-		// find label or main
-		string startNumber = "0";
-		for (size_t j = filePos; j > 0; j--) {
-			if (lines[j].find("main") != string::npos) {
-				break;
-			}
-			if (lines[j].find("<label>:") != string::npos) {
-				startNumber = lines[j].substr(10);
-				if (startNumber.find(" ") < startNumber.size())
-					startNumber = startNumber.substr(0, startNumber.find(" "));
-				break;
-			}
-		}
-
-		shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sX + ", 0.000000e+00");
-		shaderS.push_back("  %" + to_string(lastValue + 2) + " = fcmp fast une float " + sW + ", 1.000000e+00");
-		shaderS.push_back("  br i1 %" + to_string(lastValue + 2) + ", label %" + to_string(lastValue + 3) + ", label %" + to_string(lastValue + 7));
-		shaderS.push_back("");
-		shaderS.push_back("; <label>:" + to_string(lastValue + 3));
-		shaderS.push_back("  %" + to_string(lastValue + 4) + " = fadd fast float " + sW + ", " + convS);
-		shaderS.push_back("  %" + to_string(lastValue + 5) + " = fmul fast float %" + to_string(lastValue + 4) + ", " + sepS);
-		shaderS.push_back("  %" + to_string(lastValue + 6) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 5));
-		shaderS.push_back("  br label %" + to_string(lastValue + 7));
-		shaderS.push_back("");
-		shaderS.push_back("; <label>:" + to_string(lastValue + 7));
-		shaderS.push_back("  %" + to_string(lastValue + 8) + " = phi float [ %" +
-			to_string(lastValue + 6) + ", %" + to_string(lastValue + 3) + " ], [ %" + to_string(lastValue + 1) + ", %" + startNumber + " ]");
-		sizeGap = 8;
-		rowGap = 12;
-
+		
+		shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
+		shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
+		shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
+		sizeGap = 3;
+		rowGap = 3;
+		
 		for (size_t i = 0; i < lines.size(); i++) {
 			string s = lines[i];
 			string s2;
@@ -581,7 +551,7 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 	return shaderOutput;
 }
 
-vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
+vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenSize, uint8_t separation) {
 	vector<UINT8> shaderOut;
 	string reg((char*)ASM.data(), ASM.size());
 	int tempReg = 0;
@@ -637,10 +607,8 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenS
 				string calcReg = "r" + to_string(tempReg + 1);
 
 				shader +=
-						"    if_ne " + sourceReg + ".w, c250.z\n" +
-						"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
-						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n" +
-						"    endif\n";
+					"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
+					"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n";
 			}
 		}
 		else {
@@ -669,7 +637,7 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenS
 	return shaderOut;
 }
 
-vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, float separation) {
+vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, float screenSize, uint8_t separation) {
 	if (ASM.size() > 0 && ASM[0] == ';')
 		return changeDXIL(ASM, left, conv, screenSize, separation);
 	if (dx9)
@@ -705,6 +673,7 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				dcl_ICB = true;
 				shader += s + "\n";
 			}
+
 			else {
 				shader += s + "\n";
 			}
@@ -725,12 +694,30 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				string sourceReg = "r" + to_string(temp - 1);
 				string calcReg = "r" + to_string(temp - 2);
 
-				shader +=
-					"ne " + calcReg + ".x, " + sourceReg + ".w, l(1.000000)\n" +
-					"if_nz " + calcReg + ".x\n" +
-					"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-					"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
-					"endif\n";
+				if (gl_minConv > 0) {
+					sprintf_s(buf, 80, "%.3f", -gl_minConv);
+					string convMin(buf);
+
+					sprintf_s(buf, 80, "%.3f", -gl_minConv * 2);
+					string convMin2(buf);
+
+					shader +=
+						//"if_ne " + sourceReg + ".w, l(1.000000)\n"
+						"if_lt " + sourceReg + ".w, l(" + convMin2 + ")\n"
+						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + convMin + ")\n" +
+						"else\n" +
+						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"endif\n" +
+						"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+						//"endif\n";
+				}
+				else {
+					shader +=
+						//"if_ne " + sourceReg + ".w, l(1.000000)\n"
+						"add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+						//"endif\n";
+				}
 			}
 			if (oReg.size() == 0) {
 				// no output
