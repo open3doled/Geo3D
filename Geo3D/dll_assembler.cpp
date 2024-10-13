@@ -2,7 +2,6 @@
 #include "crc32_hash.hpp"
 #include "dxcapi.h"
 #include "wrl.h"
-#pragma comment(lib, "urlmon.lib")
 
 
 using Microsoft::WRL::ComPtr;
@@ -481,11 +480,35 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		sprintf_s(buf, 80, "0x%016llX", *pConv);
 		string convS(buf);
 		
-		shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
-		shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
-		shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
-		sizeGap = 3;
-		rowGap = 3;
+		// find label or main
+		string startNumber = "0";
+		for (size_t j = filePos; j > 0; j--) {
+			if (lines[j].find("main") != string::npos) {
+				break;
+			}
+			if (lines[j].find("<label>:") != string::npos) {
+				startNumber = lines[j].substr(10);
+				if (startNumber.find(" ") < startNumber.size())
+					startNumber = startNumber.substr(0, startNumber.find(" "));
+				break;
+			}
+		}
+
+		shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sX + ", 0.000000e+00");
+		shaderS.push_back("  %" + to_string(lastValue + 2) + " = fcmp fast une float " + sW + ", 1.000000e+00");
+		shaderS.push_back("  br i1 %" + to_string(lastValue + 2) + ", label %" + to_string(lastValue + 3) + ", label %" + to_string(lastValue + 7));
+		shaderS.push_back("");
+		shaderS.push_back("; <label>:" + to_string(lastValue + 3));
+		shaderS.push_back("  %" + to_string(lastValue + 4) + " = fadd fast float " + sW + ", " + convS);
+		shaderS.push_back("  %" + to_string(lastValue + 5) + " = fmul fast float %" + to_string(lastValue + 4) + ", " + sepS);
+		shaderS.push_back("  %" + to_string(lastValue + 6) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 5));
+		shaderS.push_back("  br label %" + to_string(lastValue + 7));
+		shaderS.push_back("");
+		shaderS.push_back("; <label>:" + to_string(lastValue + 7));
+		shaderS.push_back("  %" + to_string(lastValue + 8) + " = phi float [ %" +
+			to_string(lastValue + 6) + ", %" + to_string(lastValue + 3) + " ], [ %" + to_string(lastValue + 1) + ", %" + startNumber + " ]");
+		sizeGap = 8;
+		rowGap = 12;
 		
 		for (size_t i = 0; i < lines.size(); i++) {
 			string s = lines[i];
@@ -607,8 +630,10 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenS
 				string calcReg = "r" + to_string(tempReg + 1);
 
 				shader +=
+					"    if_ne " + sourceReg + ".w, c250.z\n" +
 					"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
-					"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n";
+					"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n" +
+					"    endif\n";
 			}
 		}
 		else {
@@ -702,21 +727,21 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 					string convMin2(buf);
 
 					shader +=
-						//"if_ne " + sourceReg + ".w, l(1.000000)\n"
-						"if_lt " + sourceReg + ".w, l(" + convMin2 + ")\n"
-						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + convMin + ")\n" +
-						"else\n" +
-						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-						"endif\n" +
-						"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
-						//"endif\n";
+						"if_ne " + sourceReg + ".w, l(1.000000)\n"
+						"  if_lt " + sourceReg + ".w, l(" + convMin2 + ")\n"
+						"    add " + calcReg + ".x, " + sourceReg + ".w, l(" + convMin + ")\n" +
+						"  else\n" +
+						"    add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"  endif\n" +
+						"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
+						"endif\n";
 				}
 				else {
 					shader +=
-						//"if_ne " + sourceReg + ".w, l(1.000000)\n"
-						"add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-						"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
-						//"endif\n";
+						"if_ne " + sourceReg + ".w, l(1.000000)\n"
+						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
+						"endif\n";
 				}
 			}
 			if (oReg.size() == 0) {

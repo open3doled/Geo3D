@@ -598,6 +598,7 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	if (device->get_api() == device_api::opengl) {
 		if (gl_dumpASM)
 			gl_dumpBIN = true;
+		gl_dumpASM = false;
 	}
 
 	PSO pso = {};
