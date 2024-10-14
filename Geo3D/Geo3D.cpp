@@ -442,21 +442,21 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
 
-		VS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		VS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+		VS_L = patch(dx9, ASM, true);
+		VS_R = patch(dx9, ASM, false);
 		
-		auto test = changeASM(dx9, VS_L, true, gl_conv, gl_screenSize, gl_separation);
+		auto test = changeASM(dx9, VS_L, true);
 		if (test.size() > 0) {
 			VS_L = test;
-			VS_R = changeASM(dx9, VS_R, false, gl_conv, gl_screenSize, gl_separation);
+			VS_R = changeASM(dx9, VS_R, false);
 		}
 	}
 	else if (pso->vsS.code_size > 0) {
 		auto ASM = asmShader(pso->vsS.code, pso->vsS.code_size);
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		auto test = changeASM(dx9, ASM, true);
 		if (test.size() > 0) {
 			VS_L = test;
-			VS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			VS_R = changeASM(dx9, ASM, false);
 		}
 		else {
 			pso->vs->code = pso->vsS.code;
@@ -466,10 +466,10 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	
 	if (pso->dsS.code_size > 0) {
 		auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		auto test = changeASM(dx9, ASM, true);
 		if (test.size() > 0) {
 			DS_L = test;
-			DS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			DS_R = changeASM(dx9, ASM, false);
 		}
 		else {
 			pso->ds->code = pso->dsS.code;
@@ -478,10 +478,10 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	}
 	if (pso->gsS.code_size > 0) {
 		auto ASM = asmShader(pso->gsS.code, pso->gsS.code_size);
-		auto test = changeASM(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
+		auto test = changeASM(dx9, ASM, true);
 		if (test.size() > 0) {
 			GS_L = test;
-			GS_R = changeASM(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+			GS_R = changeASM(dx9, ASM, false);
 		}
 		else {
 			pso->gs->code = pso->gsS.code;
@@ -491,8 +491,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->psEdit.size() > 0) {
 		ASM = pso->psEdit;
-		PS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		PS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+		PS_L = patch(dx9, ASM, true);
+		PS_R = patch(dx9, ASM, false);
 	}
 	else if (pso->psS.code_size > 0) {
 		pso->ps->code = pso->psS.code;
@@ -501,8 +501,8 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	if (pso->csEdit.size() > 0) {
 		ASM = pso->csEdit;
-		CS_L = patch(dx9, ASM, true, gl_conv, gl_screenSize, gl_separation);
-		CS_R = patch(dx9, ASM, false, gl_conv, gl_screenSize, gl_separation);
+		CS_L = patch(dx9, ASM, true);
+		CS_R = patch(dx9, ASM, false);
 	}
 	else if (pso->csS.code_size > 0) {
 		pso->cs->code = pso->csS.code;
