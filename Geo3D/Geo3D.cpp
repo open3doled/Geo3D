@@ -48,9 +48,11 @@ struct PSO {
 
 	shader_desc* ds;
 	shader_desc dsS;
+	uint32_t crcDS;
 
 	shader_desc* gs;
 	shader_desc gsS;
+	uint32_t crcGS;
 
 	bool skip;
 	bool noDraw;
@@ -380,8 +382,39 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 			return;
 
 		auto ASM = readV(pso->vsS.code, pso->vsS.code_size);
-		auto cVS_L = changeOpenGL(true, ASM);
-		auto cVS_R = changeOpenGL(false, ASM);
+		auto VS_L = changeOpenGL(true, ASM);
+		auto VS_R = changeOpenGL(false, ASM);
+
+		if (gl_dumpASM) {
+			FILE* f;
+			wchar_t sPath[MAX_PATH];
+
+			if (VS_L.size() > 0) {
+				filesystem::path file;
+				filesystem::create_directories(dump_path);
+				swprintf_s(sPath, MAX_PATH, L"%08lX-vs-left.txt", pso->crcVS);
+				file = dump_path / sPath;
+				_wfopen_s(&f, file.c_str(), L"wb");
+				if (f != 0) {
+					fwrite(VS_L.data(), 1, VS_L.size(), f);
+					fclose(f);
+				}
+			}
+			if (VS_R.size() > 0) {
+				filesystem::path file;
+				filesystem::create_directories(dump_path);
+				swprintf_s(sPath, MAX_PATH, L"%08lX-vs-right.txt", pso->crcVS);
+				file = dump_path / sPath;
+				_wfopen_s(&f, file.c_str(), L"wb");
+				if (f != 0) {
+					fwrite(VS_R.data(), 1, VS_R.size(), f);
+					fclose(f);
+				}
+			}
+		}
+
+		if (gl_dumpOnly)
+			return;
 
 		if (cVS_L.size() > 0) {
 			pso->vs->code = cVS_L.data();
@@ -430,33 +463,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 			pso->vs->code_size = pso->vsS.code_size;
 		}
 	}
-
-	if (gl_dumpASM) {
-		FILE* f;
-		wchar_t sPath[MAX_PATH];
-		if (VS_L.size() > 0) {
-			filesystem::path file;
-			filesystem::create_directories(dump_path);
-			swprintf_s(sPath, MAX_PATH, L"%08lX-vs-left.bin", pso->crcVS);
-			file = dump_path / sPath;
-			_wfopen_s(&f, file.c_str(), L"wb");
-			if (f != 0) {
-				fwrite(VS_L.data(), 1, VS_L.size(), f);
-				fclose(f);
-			}
-		}
-		if (VS_R.size() > 0) {
-			filesystem::path file;
-			filesystem::create_directories(dump_path);
-			swprintf_s(sPath, MAX_PATH, L"%08lX-vs-right.bin", pso->crcVS);
-			file = dump_path / sPath;
-			_wfopen_s(&f, file.c_str(), L"wb");
-			if (f != 0) {
-				fwrite(VS_R.data(), 1, VS_R.size(), f);
-				fclose(f);
-			}
-		}
-	}
 	
 	if (pso->dsS.code_size > 0) {
 		auto ASM = asmShader(pso->dsS.code, pso->dsS.code_size);
@@ -502,6 +508,125 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		pso->cs->code = pso->csS.code;
 		pso->cs->code_size = pso->csS.code_size;
 	}
+
+	if (gl_dumpASM) {
+		FILE* f;
+		wchar_t sPath[MAX_PATH];
+
+		if (VS_L.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-vs-left.txt", pso->crcVS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(VS_L.data(), 1, VS_L.size(), f);
+				fclose(f);
+			}
+		}
+		if (VS_R.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-vs-right.txt", pso->crcVS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(VS_R.data(), 1, VS_R.size(), f);
+				fclose(f);
+			}
+		}
+		if (PS_L.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-ps-left.bin", pso->crcPS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(PS_L.data(), 1, PS_L.size(), f);
+				fclose(f);
+			}
+		}
+		if (VS_R.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-ps-right.bin", pso->crcPS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(PS_R.data(), 1, PS_R.size(), f);
+				fclose(f);
+			}
+		}
+		if (CS_L.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-cs-left.bin", pso->crcCS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(CS_L.data(), 1, CS_L.size(), f);
+				fclose(f);
+			}
+		}
+		if (CS_R.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-cs-right.bin", pso->crcCS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(CS_R.data(), 1, CS_R.size(), f);
+				fclose(f);
+			}
+		}
+		if (DS_L.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-ds-left.bin", pso->crcDS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(DS_L.data(), 1, DS_L.size(), f);
+				fclose(f);
+			}
+		}
+		if (DS_R.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-ds-right.bin", pso->crcDS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(DS_R.data(), 1, DS_R.size(), f);
+				fclose(f);
+			}
+		}
+		if (GS_L.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-gs-left.bin", pso->crcGS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(GS_L.data(), 1, GS_L.size(), f);
+				fclose(f);
+			}
+		}
+		if (GS_R.size() > 0) {
+			filesystem::path file;
+			filesystem::create_directories(dump_path);
+			swprintf_s(sPath, MAX_PATH, L"%08lX-gs-right.bin", pso->crcGS);
+			file = dump_path / sPath;
+			_wfopen_s(&f, file.c_str(), L"wb");
+			if (f != 0) {
+				fwrite(GS_R.data(), 1, GS_R.size(), f);
+				fclose(f);
+			}
+		}
+	}
+
+	if (gl_dumpOnly)
+		return;
 
 	if (VS_L.size() > 0) {
 		auto vsV = readV(pso->vsS.code, pso->vsS.code_size);
@@ -623,11 +748,11 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 			break;
 		case pipeline_subobject_type::domain_shader:
 			ds = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"ds", ds->code, ds->code_size);
+			pso.crcDS = dumpShader(L"ds", ds->code, ds->code_size);
 			break;
 		case pipeline_subobject_type::geometry_shader:
 			gs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"gs", gs->code, gs->code_size);
+			pso.crcGS = dumpShader(L"gs", gs->code, gs->code_size);
 			break;
 		case pipeline_subobject_type::hull_shader:
 			hs = static_cast<shader_desc*>(subobjects[i].data);
@@ -635,9 +760,6 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 			break;
 		}
 	}
-
-	if (gl_dumpOnly)
-		return;
 
 	wchar_t sPath[MAX_PATH];
 	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso.crcVS);
