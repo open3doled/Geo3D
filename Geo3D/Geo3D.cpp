@@ -901,16 +901,18 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 }
 
 static void onPresent(command_queue* queue, swapchain* swapchain, const rect* source_rect, const rect* dest_rect, uint32_t dirty_rect_count, const rect* dirty_rects) {
-	//gl_left = !gl_left;
+	gl_left = !gl_left;
 }
 
 static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
+	/*
 	auto var = runtime->find_uniform_variable(nullptr, "framecount");
 	unsigned int framecount = 0;
 	runtime->get_uniform_value_uint(var, &framecount, 1);
 	if (framecount > 0)
 		gl_left = (framecount % 2) == 0;
+	*/
 
 	if (runtime->is_key_pressed(VK_F8)) {
 		gl_left = !gl_left;
