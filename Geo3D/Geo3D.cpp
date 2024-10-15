@@ -18,6 +18,7 @@ bool gl_dumpASM = false;
 
 bool gl_2D = false;
 bool gl_quickLoad = true;
+bool gl_DXILfix = false;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
@@ -1245,6 +1246,7 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "DumpASM", gl_dumpASM);
 
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
+	reshade::get_config_value(nullptr, "Geo3D", "DXILfix", gl_DXILfix);
 	
 	reshade::get_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "StereoMinConvergence", gl_minConv);

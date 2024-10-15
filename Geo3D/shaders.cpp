@@ -9,10 +9,11 @@ CRITICAL_SECTION gl_CS;
 
 bool gl_dumpBIN = false;
 bool gl_dumpASM = false;
-float gl_separation = 0.1f;
-float gl_screenSize = 55;
+uint8_t gl_separation = 14;
+float gl_screenSize = 27;
 float gl_conv = 1.0;
-extern float gl_minConv = 0.0f;
+float gl_minConv = 0.0f;
+bool gl_DXILfix = false;
 bool gl_left = false;
 std::filesystem::path dump_path;
 
