@@ -229,11 +229,19 @@ vector<UINT8> convertSM2(vector<UINT8> asmFile) {
 			pos = reg.find("sincos", pos + 1);
 	}
 
-	size_t vsPos = reg.find("vs_2_0");
+	size_t vsPos = reg.find("vs_2");
 	if (vsPos != string::npos)
 		reg = reg.substr(0, vsPos) + "vs_3_0" + reg.substr(vsPos + 6);
 
-	size_t psPos = reg.find("ps_2_0");
+	size_t psPos = reg.find("ps_2");
+	if (psPos != string::npos)
+		reg = reg.substr(0, psPos) + "ps_3_0" + reg.substr(psPos + 6);
+
+	vsPos = reg.find("vs_1");
+	if (vsPos != string::npos)
+		reg = reg.substr(0, vsPos) + "vs_3_0" + reg.substr(vsPos + 6);
+
+	psPos = reg.find("ps_1");
 	if (psPos != string::npos)
 		reg = reg.substr(0, psPos) + "ps_3_0" + reg.substr(psPos + 6);
 
@@ -252,7 +260,8 @@ vector<UINT8> asmShader(const void* pData, size_t length) {
 	string reg((char*)ASM.data());
 	if (reg.find("vs_2") != string::npos ||
 		reg.find("ps_2") != string::npos ||
-		reg.find("vs_1") != string::npos) {
+		reg.find("vs_1") != string::npos ||
+		reg.find("ps_1") != string::npos) {
 		return convertSM2(ASM);
 	}
 	else {
