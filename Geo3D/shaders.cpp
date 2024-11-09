@@ -4,6 +4,10 @@
 #include "dll_assembler.hpp"
 #include <iostream>
 #include <tchar.h>
+#include "dxcapi.h"
+#include "wrl.h"
+
+using Microsoft::WRL::ComPtr;
 
 CRITICAL_SECTION gl_CS;
 
@@ -13,6 +17,7 @@ float gl_separation = 0.1f;
 float gl_screenSize = 55;
 float gl_conv = 1.0;
 bool gl_left = false;
+HMODULE dxc_module2 = 0;
 std::filesystem::path dump_path;
 
 // Primary hash calculation for all shader file names, all textures.

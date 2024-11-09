@@ -1062,7 +1062,7 @@ vector<UINT8> disassembler(vector<UINT8> buffer) {
 	}
 	else {
 		if (dxc_module == 0)
-			dxc_module = ::LoadLibrary(L"dxcompiler.dll");
+			dxc_module = ::LoadLibrary(L"dxcompiler2.dll");
 		if (dxc_module != 0) {
 			DxcCreateInstanceProc dxc_create_func = (DxcCreateInstanceProc)GetProcAddress(dxc_module, "DxcCreateInstance");
 			ComPtr<IDxcCompiler3> pCompiler;
@@ -3301,7 +3301,7 @@ vector<UINT8> assembler(bool dx9, vector<UINT8> asmFile, vector<UINT8> buffer) {
 		return ret;
 	if (asmFile[0] == ';') {
 		if (dxc_module == 0)
-			dxc_module = ::LoadLibrary(L"dxcompiler.dll");
+			dxc_module = ::LoadLibrary(L"dxcompiler2.dll");
 		if (dxc_module != 0) {
 			DxcCreateInstanceProc dxc_create_func = (DxcCreateInstanceProc)GetProcAddress(dxc_module, "DxcCreateInstance");
 			ComPtr<IDxcUtils> pUtils;
@@ -3324,7 +3324,7 @@ vector<UINT8> assembler(bool dx9, vector<UINT8> asmFile, vector<UINT8> buffer) {
 					ret.push_back(pASM[i]);
 				}
 				if (dxil_module == 0)
-					dxil_module = ::LoadLibrary(L"dxil.dll");
+					dxil_module = ::LoadLibrary(L"dxil2.dll");
 				if (dxil_module != 0) {
 					DxcCreateInstanceProc dxil_create_func = (DxcCreateInstanceProc)GetProcAddress(dxil_module, "DxcCreateInstance");
 					ComPtr<IDxcLibrary> library;
