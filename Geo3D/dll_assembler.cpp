@@ -28,7 +28,7 @@ vector<UINT8> ret;
 	return ret;
 }
 
-uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool pipeline, uint32_t crcVS) {
+uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, uint32_t crc2) {
 	uint32_t crc = compute_crc32((UINT8*)pData, length);
 	FILE *f;
 	wchar_t sPath[MAX_PATH];
@@ -45,20 +45,19 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool 
 			}
 		}
 		if (gl_dumpASM) {
-			auto ASM = asmShader(pData, length);
+			vector<UINT8> ASM;
+			if (crc2)
+				ASM = readV(pData, length);
+			else
+				ASM = asmShader(pData, length);
 			filesystem::path file;
-			if (pipeline) {
-				swprintf_s(sPath, MAX_PATH, L"%08lX", crcVS);
-				auto pipeline_path = dump_path / sPath;
-				filesystem::create_directories(pipeline_path);
+			
+			filesystem::create_directories(dump_path);
+			if (crc2)
+				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc2, type);
+			else
 				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-				file = pipeline_path / sPath;
-			}
-			else {
-				filesystem::create_directories(dump_path);
-				swprintf_s(sPath, MAX_PATH, L"%08lX-%s.txt", crc, type);
-				file = dump_path / sPath;
-			}
+			file = dump_path / sPath;
 			_wfopen_s(&f, file.c_str(), L"wb");
 			if (f != 0) {
 				fwrite(ASM.data(), 1, ASM.size(), f);
@@ -67,80 +66,6 @@ uint32_t dumpShader(const wchar_t *type, const void *pData, size_t length, bool 
 		}
 	}
 	return crc;
-}
-
-vector<DWORD> changeSM2(vector<DWORD> code, bool left, float conv, float screenSize, float separation) {
-	int tempReg = 10;
-	vector<DWORD> newCode;
-	bool define = false;
-	for (size_t i = 0; i < code.size(); i++) {
-		if (code[i] == 0xFFFF) {
-			//add r1.x, r0.w, c250.x
-			//mad r0.x, r1.x, c250.y, r0.x
-			//mov oPos, r0
-			newCode.push_back(0x03000002); // add
-			newCode.push_back(0x80010000 + tempReg + 1);
-			newCode.push_back(0x80FF0000 + tempReg + 0);
-			newCode.push_back(0xA00000FA);
-
-
-			newCode.push_back(0x04000004); // mad
-			newCode.push_back(0x80010000 + tempReg + 0);
-			newCode.push_back(0x80000000 + tempReg + 1);
-			newCode.push_back(0xA05500FA);
-			newCode.push_back(0x80000000 + tempReg + 0);
-
-			newCode.push_back(0x02000001); // mov
-			newCode.push_back(0xC00F0000);
-			newCode.push_back(0x80E40000 + tempReg + 0);
-
-			newCode.push_back(code[i]);
-			break;
-		}
-		if (!define) {
-			if (code[i] == 0x200001F) {
-				float finalSep = separation * 0.01f * 6.5f / (2.54f * screenSize * 16 / sqrtf(256 + 81));
-				// first declare
-				newCode.push_back(0x5000051);
-				newCode.push_back(0xA00F00FA);
-				float fConv = -conv;
-				float fSep = left ? -finalSep : finalSep;
-				DWORD *conv = (DWORD *)&fConv;
-				DWORD *sep = (DWORD *)&fSep;
-				newCode.push_back(*conv);
-				newCode.push_back(*sep);
-				newCode.push_back(0);
-				newCode.push_back(0);
-				// complete declare
-				newCode.push_back(code[i++]);
-				newCode.push_back(code[i++]);
-				newCode.push_back(code[i]);
-				define = true;
-			}
-			else {
-				newCode.push_back(code[i]);
-			}
-		}
-		else {
-			int numValues = (code[i] & 0xFF000000) >> 24;
-			newCode.push_back(code[i++]);
-			if ((code[i] & 0xF0000000) == 0xC0000000) {
-				// oPos, replace oPos with r0
-				DWORD oPosReplacement = 0x80000000 + tempReg + (code[i++] & 0xFFFFFFF);
-				newCode.push_back(oPosReplacement);
-			}
-			else {
-				newCode.push_back(code[i++]);
-			}
-			numValues--;
-			while (numValues) {
-				newCode.push_back(code[i++]);
-				numValues--;
-			}
-			i--;
-		}
-	}
-	return newCode;
 }
 
 vector<UINT8> convertSM2(vector<UINT8> asmFile) {

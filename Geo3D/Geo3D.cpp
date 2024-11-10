@@ -47,9 +47,11 @@ struct PSO {
 
 	shader_desc* ds;
 	shader_desc dsS;
+	uint32_t crcDS;
 
 	shader_desc* gs;
 	shader_desc gsS;
+	uint32_t crcGS;
 
 	bool skip;
 	bool noDraw;
@@ -229,11 +231,7 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 			newDepth->front_stencil_func = depth_stencil_state.front_stencil_func;
 			newDepth->front_stencil_pass_op = depth_stencil_state.front_stencil_pass_op;
 			newDepth->stencil_enable = depth_stencil_state.stencil_enable;
-			/*
-			newDepth->stencil_read_mask = depth_stencil_state.stencil_read_mask;
-			newDepth->stencil_reference_value = depth_stencil_state.stencil_reference_value;
-			newDepth->stencil_write_mask = depth_stencil_state.stencil_write_mask;
-			*/			
+
 			newDepth->front_stencil_read_mask = depth_stencil_state.front_stencil_read_mask;
 			newDepth->front_stencil_reference_value = depth_stencil_state.front_stencil_reference_value;
 			newDepth->front_stencil_write_mask = depth_stencil_state.front_stencil_write_mask;			
@@ -456,22 +454,27 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (cVS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
+		dumpShader(L"vs-left", VS_L.data(), VS_L.size(), pso->crcVS);
 	}
 	if (cPS_L.size() > 0) {
 		pso->ps->code = cPS_L.data();
 		pso->ps->code_size = cPS_L.size();
+		dumpShader(L"ps-left", PS_L.data(), PS_L.size(), pso->crcPS);
 	}
 	if (cCS_L.size() > 0) {
 		pso->cs->code = cCS_L.data();
 		pso->cs->code_size = cCS_L.size();
+		dumpShader(L"cs-left", CS_L.data(), CS_L.size(), pso->crcCS);
 	}
 	if (cDS_L.size() > 0) {
 		pso->ds->code = cDS_L.data();
 		pso->ds->code_size = cDS_L.size();
+		dumpShader(L"ds-left", DS_L.data(), DS_L.size(), pso->crcDS);
 	}
 	if (cGS_L.size() > 0) {
 		pso->gs->code = cGS_L.data();
 		pso->gs->code_size = cGS_L.size();
+		dumpShader(L"gs-left", GS_L.data(), GS_L.size(), pso->crcGS);
 	}
 
 	reshade::api::pipeline pipeL;
@@ -482,22 +485,27 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (cVS_R.size() > 0) {
 		pso->vs->code = cVS_R.data();
 		pso->vs->code_size = cVS_R.size();
+		dumpShader(L"vs-right", VS_R.data(), VS_R.size(), pso->crcVS);
 	}
 	if (cPS_R.size() > 0) {
 		pso->ps->code = cPS_R.data();
 		pso->ps->code_size = cPS_R.size();
+		dumpShader(L"ps-right", PS_R.data(), PS_R.size(), pso->crcPS);
 	}
 	if (cCS_R.size() > 0) {
 		pso->cs->code = cCS_R.data();
 		pso->cs->code_size = cCS_R.size();
+		dumpShader(L"cs-right", CS_R.data(), CS_R.size(), pso->crcCS);
 	}
 	if (cDS_R.size() > 0) {
 		pso->ds->code = cDS_R.data();
 		pso->ds->code_size = cDS_R.size();
+		dumpShader(L"ds-right", DS_R.data(), DS_R.size(), pso->crcDS);
 	}
 	if (cGS_R.size() > 0) {
 		pso->gs->code = cGS_R.data();
 		pso->gs->code_size = cGS_R.size();
+		dumpShader(L"gs-right", GS_R.data(), GS_R.size(), pso->crcGS);
 	}
 
 	reshade::api::pipeline pipeR;
@@ -543,11 +551,11 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 			break;
 		case pipeline_subobject_type::domain_shader:
 			ds = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"ds", ds->code, ds->code_size);
+			pso.crcDS = dumpShader(L"ds", ds->code, ds->code_size);
 			break;
 		case pipeline_subobject_type::geometry_shader:
 			gs = static_cast<shader_desc*>(subobjects[i].data);
-			dumpShader(L"gs", gs->code, gs->code_size);
+			pso.crcGS = dumpShader(L"gs", gs->code, gs->code_size);
 			break;
 		case pipeline_subobject_type::hull_shader:
 			hs = static_cast<shader_desc*>(subobjects[i].data);
