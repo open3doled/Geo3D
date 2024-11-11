@@ -651,8 +651,7 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				string calcReg = "r" + to_string(temp - 2);
 
 				shader +=
-					"ne " + calcReg + ".x, " + sourceReg + ".w, l(1.000000)\n" +
-					"if_nz " + calcReg + ".x\n" +
+					"if_ne " + sourceReg + ".w, l(1.000000)\n" +
 					"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
 					"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
 					"endif\n";
