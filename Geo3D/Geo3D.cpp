@@ -425,6 +425,30 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	}
 
 	if (VS_L.size() > 0) {
+		dumpShader(L"vs-left", VS_L.data(), VS_L.size(), pso->crcVS);
+		dumpShader(L"vs-right", VS_R.data(), VS_R.size(), pso->crcVS);
+	}
+	if (PS_L.size() > 0) {
+		dumpShader(L"ps-left", PS_L.data(), PS_L.size(), pso->crcPS);
+		dumpShader(L"ps-right", PS_R.data(), PS_R.size(), pso->crcPS);
+	}
+	if (CS_L.size() > 0) {
+		dumpShader(L"cs-left", CS_L.data(), CS_L.size(), pso->crcCS);
+		dumpShader(L"cs-right", CS_R.data(), CS_R.size(), pso->crcCS);
+	}
+	if (DS_L.size() > 0) {
+		dumpShader(L"ds-left", DS_L.data(), DS_L.size(), pso->crcDS);
+		dumpShader(L"ds-right", DS_R.data(), DS_R.size(), pso->crcDS);
+	}
+	if (GS_L.size() > 0) {
+		dumpShader(L"gs-left", GS_L.data(), GS_L.size(), pso->crcGS);
+		dumpShader(L"gs-right", GS_R.data(), GS_R.size(), pso->crcGS);
+	}
+
+	if (gl_dumpOnly)
+		return;
+
+	if (VS_L.size() > 0) {
 		auto vsV = readV(pso->vsS.code, pso->vsS.code_size);
 		cVS_L = assembler(dx9, VS_L, vsV);
 		cVS_R = assembler(dx9, VS_R, vsV);
@@ -454,27 +478,23 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (cVS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
-		dumpShader(L"vs-left", VS_L.data(), VS_L.size(), pso->crcVS);
+		
 	}
 	if (cPS_L.size() > 0) {
 		pso->ps->code = cPS_L.data();
 		pso->ps->code_size = cPS_L.size();
-		dumpShader(L"ps-left", PS_L.data(), PS_L.size(), pso->crcPS);
 	}
 	if (cCS_L.size() > 0) {
 		pso->cs->code = cCS_L.data();
 		pso->cs->code_size = cCS_L.size();
-		dumpShader(L"cs-left", CS_L.data(), CS_L.size(), pso->crcCS);
 	}
 	if (cDS_L.size() > 0) {
 		pso->ds->code = cDS_L.data();
 		pso->ds->code_size = cDS_L.size();
-		dumpShader(L"ds-left", DS_L.data(), DS_L.size(), pso->crcDS);
 	}
 	if (cGS_L.size() > 0) {
 		pso->gs->code = cGS_L.data();
 		pso->gs->code_size = cGS_L.size();
-		dumpShader(L"gs-left", GS_L.data(), GS_L.size(), pso->crcGS);
 	}
 
 	reshade::api::pipeline pipeL;
@@ -485,27 +505,22 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (cVS_R.size() > 0) {
 		pso->vs->code = cVS_R.data();
 		pso->vs->code_size = cVS_R.size();
-		dumpShader(L"vs-right", VS_R.data(), VS_R.size(), pso->crcVS);
 	}
 	if (cPS_R.size() > 0) {
 		pso->ps->code = cPS_R.data();
 		pso->ps->code_size = cPS_R.size();
-		dumpShader(L"ps-right", PS_R.data(), PS_R.size(), pso->crcPS);
 	}
 	if (cCS_R.size() > 0) {
 		pso->cs->code = cCS_R.data();
 		pso->cs->code_size = cCS_R.size();
-		dumpShader(L"cs-right", CS_R.data(), CS_R.size(), pso->crcCS);
 	}
 	if (cDS_R.size() > 0) {
 		pso->ds->code = cDS_R.data();
 		pso->ds->code_size = cDS_R.size();
-		dumpShader(L"ds-right", DS_R.data(), DS_R.size(), pso->crcDS);
 	}
 	if (cGS_R.size() > 0) {
 		pso->gs->code = cGS_R.data();
 		pso->gs->code_size = cGS_R.size();
-		dumpShader(L"gs-right", GS_R.data(), GS_R.size(), pso->crcGS);
 	}
 
 	reshade::api::pipeline pipeR;
@@ -564,9 +579,6 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 		}
 	}
 
-	if (gl_dumpOnly)
-		return;
-
 	wchar_t sPath[MAX_PATH];
 	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso.crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
@@ -577,9 +589,6 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	swprintf_s(sPath, MAX_PATH, L"%08lX-cs.skip", pso.crcCS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.skip = true;
-
-	if (pso.skip)
-		return;
 
 	swprintf_s(sPath, MAX_PATH, L"%08lX-vs.dump", pso.crcVS);
 	if (fixes.find(fix_path / sPath) != fixes.end())
@@ -601,7 +610,7 @@ static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subo
 	if (fixes.find(fix_path / sPath) != fixes.end())
 		pso.csEdit = readFile(fix_path / sPath);
 	
-	if (gl_quickLoad) {
+	if (gl_quickLoad && !gl_dumpOnly) {
 		pso.convergence = 0;
 	}
 	else {
@@ -656,6 +665,7 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 				pso2 = pso;
 			else if (pso->crcVS)
 				pso2 = nullptr;
+
 			if (pso2 != nullptr) {
 				if (pso2->skip)
 					return;
@@ -989,8 +999,20 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	}
 
 	if (runtime->is_key_down(VK_CONTROL)) {
-		if (runtime->is_key_pressed(0x54)) { // T key
+		if (runtime->is_key_pressed(VK_F2)) {
 			gl_2D = !gl_2D;
+		}
+		if (runtime->is_key_pressed(VK_F3)) {
+			gl_separation -= 3.0f;
+			if (gl_separation < 1)
+				gl_separation = 1;
+			reshade::set_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
+		}
+		if (runtime->is_key_pressed(VK_F4)) {
+			gl_separation += 3.0f;
+			if (gl_separation > 100)
+				gl_separation = 100;
+			reshade::set_config_value(nullptr, "Geo3D", "StereoSeparation", gl_separation);
 		}
 		if (runtime->is_key_pressed(VK_F5)) {
 			gl_conv *= 0.8f;
