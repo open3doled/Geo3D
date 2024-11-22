@@ -13,6 +13,7 @@ DWORD strToDWORD(string s);
 
 extern int gl_dumpBIN;
 extern int gl_dumpASM;
+extern int gl_type;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -412,7 +413,7 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		sprintf_s(buf, 80, "0x%016llX", *pConv);
 		string convS(buf);
 
-		if (false) {
+		if (gl_type) {
 			shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
 			shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
 			shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
@@ -570,11 +571,18 @@ vector<UINT8> changeASM9(vector<UINT8> ASM, bool left, float conv, float screenS
 				string sourceReg = "r" + to_string(tempReg);
 				string calcReg = "r" + to_string(tempReg + 1);
 
-				shader +=
+				if (gl_type) {
+					shader +=
+						"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
+						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n";
+				}
+				else {
+					shader +=
 						"    if_ne " + sourceReg + ".w, c250.z\n" +
 						"      add " + calcReg + ".x, " + sourceReg + ".w, c250.x\n" +
 						"      mad " + oReg + ".x, " + calcReg + ".x, c250.y, " + sourceReg + ".x\n" +
 						"    endif\n";
+				}
 			}
 		}
 		else {
@@ -659,11 +667,19 @@ vector<UINT8> changeASM(bool dx9, vector<UINT8> ASM, bool left, float conv, floa
 				string sourceReg = "r" + to_string(temp - 1);
 				string calcReg = "r" + to_string(temp - 2);
 
-				shader +=
-					"if_ne " + sourceReg + ".w, l(1.000000)\n" +
-					"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
-					"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
-					"endif\n";
+				if (gl_type) {
+					shader +=
+						"add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n";
+				}
+				else {
+					shader +=
+						"ne " + calcReg + ".x, " + sourceReg + ".w, l(1.000000)\n" +
+						"if_nz " + calcReg + ".x\n" +
+						"  add " + calcReg + ".x, " + sourceReg + ".w, l(" + conv + ")\n" +
+						"  mad " + oReg + ".x, " + calcReg + ".x, l(" + sep + "), " + sourceReg + ".x\n" +
+						"endif\n";
+				}
 			}
 			if (oReg.size() == 0) {
 				// no output
