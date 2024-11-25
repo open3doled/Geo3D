@@ -14,6 +14,7 @@ DWORD strToDWORD(string s);
 extern int gl_dumpBIN;
 extern int gl_dumpASM;
 extern int gl_type;
+extern int gl_depthZ;
 
 HMODULE dxc_module = 0;
 HMODULE dxil_module = 0;
@@ -414,7 +415,10 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		string convS(buf);
 
 		if (gl_type) {
-			shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
+			if (gl_depthZ)
+				shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sZ + ", " + convS);
+			else
+				shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sW + ", " + convS);
 			shaderS.push_back("  %" + to_string(lastValue + 2) + " = fmul fast float %" + to_string(lastValue + 1) + ", " + sepS);
 			shaderS.push_back("  %" + to_string(lastValue + 3) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 2));
 			sizeGap = 3;

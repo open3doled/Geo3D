@@ -15,6 +15,7 @@ int gl_dumpBIN = false;
 int gl_dumpOnly = false;
 int gl_dumpASM = false;
 int gl_type = false;
+int gl_depthZ = false;
 
 bool gl_2D = false;
 bool gl_quickLoad = true;
@@ -1034,6 +1035,7 @@ static void load_config()
 
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 	reshade::get_config_value(nullptr, "Geo3D", "Type", gl_type);
+	reshade::get_config_value(nullptr, "Geo3D", "DepthZ", gl_depthZ);
 
 	reshade::get_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "StereoScreenSize", gl_screenSize);
@@ -1081,6 +1083,7 @@ static void onReshadeOverlay(reshade::api::effect_runtime* runtime)
 			ImGui::Text("Vulkan");
 		else
 			ImGui::Text("DirectX %s", dx9 ? "9" : dx10 ? "10" : dx11 ? "11" : "12");
+		ImGui::Text("ScreenSize %0.1f", gl_screenSize);
 		ImGui::Text("Separation %0.1f", gl_separation);
 		ImGui::Text("Convergence %.3f", gl_conv);
 
