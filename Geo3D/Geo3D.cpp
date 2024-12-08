@@ -736,7 +736,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		unsigned int framecountElse = 0;
 		runtime->get_uniform_value_uint(var, &framecountElse, 1);
 		if (framecountElse > 0)
-			gl_left = (framecountElse % 2) == 0;
+			gl_left = (framecountElse % 2) == 1;
 	}
 	
 	if (runtime->is_key_pressed(VK_F8)) {
