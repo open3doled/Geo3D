@@ -19,6 +19,7 @@ int gl_depthZ = false;
 
 bool gl_2D = false;
 bool gl_quickLoad = true;
+bool gl_present = false;
 
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
@@ -159,10 +160,15 @@ static void storePipelineStateCrosire(pipeline_layout layout, uint32_t subobject
 				input_elements[k].semantic_index = input_layout[k].semantic_index;
 				input_elements[k].stride = input_layout[k].stride;
 
-				size_t SEMlen = strlen(input_layout[k].semantic) + 1;
-				char* semantic = new char[SEMlen];
-				strcpy_s(semantic, SEMlen, input_layout[k].semantic);
-				input_elements[k].semantic = semantic;
+				if (input_layout[k].semantic == nullptr) {
+					input_elements[k].semantic = nullptr;
+				}
+				else {
+					size_t SEMlen = strlen(input_layout[k].semantic) + 1;
+					char* semantic = new char[SEMlen];
+					strcpy_s(semantic, SEMlen, input_layout[k].semantic);
+					input_elements[k].semantic = semantic;
+				}
 			}
 
 			so.data = input_elements;
@@ -355,6 +361,9 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 
 	bool dx9 = device->get_api() == device_api::d3d9;
 
+	if ((device->get_api() == device_api::opengl || device->get_api() == device_api::vulkan) && gl_dumpOnly)
+		return;
+
 	if (pso->vsEdit.size() > 0) {
 		ASM = pso->vsEdit;
 
@@ -476,7 +485,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 		cGS_R = assembler(dx9, GS_R, gsV);
 	}
 
-	m.lock();
 	if (cVS_L.size() > 0) {
 		pso->vs->code = cVS_L.data();
 		pso->vs->code_size = cVS_L.size();
@@ -529,7 +537,6 @@ void updatePipeline(reshade::api::device* device, PSO* pso) {
 	if (device->create_pipeline(pso->layout, (UINT32)pso->objects.size(), pso->objects.data(), &pipeR)) {
 		pso->Right = pipeR;
 	}
-	m.unlock();
 }
 
 static void onInitPipeline(device* device, pipeline_layout layout, uint32_t subobject_count, const pipeline_subobject* subobjects, pipeline pipeline)
@@ -630,6 +637,7 @@ struct __declspec(uuid("7C1F9990-4D3F-4674-96AB-49E1840C83FC")) CommandListSkip 
 };
 
 bool edit = false;
+int fade = 60;
 map<uint32_t, uint16_t> vertexShaders;
 map<uint32_t, uint16_t> pixelShaders;
 map<uint32_t, uint16_t> computeShaders;
@@ -676,13 +684,11 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 			}
 		}
 
-		if (edit) {
-			if (pso->crcPS != 0) pixelShaders[pso->crcPS] = 1;
-			if (pso->crcVS != 0) vertexShaders[pso->crcVS] = 1;
-			if (pso->crcCS != 0) computeShaders[pso->crcCS] = 1;
-		}
-
-		if (cmd_list->get_device()->get_api() == device_api::d3d12) {
+		if (pso->crcPS != 0) pixelShaders[pso->crcPS] = fade;
+		if (pso->crcVS != 0) vertexShaders[pso->crcVS] = fade;
+		if (pso->crcCS != 0) computeShaders[pso->crcCS] = fade;
+		
+		if (cmd_list->get_device()->get_api() == device_api::d3d12 || cmd_list->get_device()->get_api() == device_api::opengl) {
 			commandListData.PS = pso->crcPS ? pso->crcPS : -1;
 			commandListData.VS = pso->crcVS ? pso->crcVS : -1;
 		}
@@ -719,30 +725,57 @@ static void onBindPipeline(command_list* cmd_list, pipeline_stage stage, reshade
 }
 
 static void onPresent(command_queue* queue, swapchain* swapchain, const rect* source_rect, const rect* dest_rect, uint32_t dirty_rect_count, const rect* dirty_rects) {
-	gl_left = !gl_left;
+	if (gl_present)
+		gl_left = !gl_left;
 }
 
 static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_list, resource_view rtv, resource_view rtv_srgb)
 {
-	/*
-	auto var = runtime->find_uniform_variable(nullptr, "framecount");
-	unsigned int framecountElse = 0;
-	runtime->get_uniform_value_uint(var, &framecountElse, 1);
-	if (framecountElse > 0)
-		gl_left = (framecountElse % 2) == 0;
-	*/
-
+	if (!gl_present) {
+		auto var = runtime->find_uniform_variable(nullptr, "framecount");
+		unsigned int framecountElse = 0;
+		runtime->get_uniform_value_uint(var, &framecountElse, 1);
+		if (framecountElse > 0)
+			gl_left = (framecountElse % 2) == 0;
+	}
+	
 	if (runtime->is_key_pressed(VK_F8)) {
 		gl_left = !gl_left;
 	}
-
+	map<uint32_t, UINT8> to_delete;
+	for (auto it = vertexShaders.begin(); it != vertexShaders.end(); it++) {
+		if (currentVS != it->first) {
+			it->second--;
+			if (it->second == 0)
+				to_delete[it->first] = 0;
+		}
+	}
+	for (auto it = to_delete.begin(); it != to_delete.end(); it++) {
+		vertexShaders.erase(it->first);
+	}
+	for (auto it = pixelShaders.begin(); it != pixelShaders.end(); it++) {
+		if (currentPS != it->first) {
+			it->second--;
+			if (it->second == 0)
+				to_delete[it->first] = 0;
+		}
+	}
+	for (auto it = to_delete.begin(); it != to_delete.end(); it++) {
+		pixelShaders.erase(it->first);
+	}
+	for (auto it = computeShaders.begin(); it != computeShaders.end(); it++) {
+		if (currentCS != it->first) {
+			it->second--;
+			if (it->second == 0)
+				to_delete[it->first] = 0;
+		}
+	}
+	for (auto it = to_delete.begin(); it != to_delete.end(); it++) {
+		computeShaders.erase(it->first);
+	}
 	if (runtime->is_key_pressed(VK_NUMPAD0)) {
 		edit = !edit;
 		if (!edit) {
-			vertexShaders.clear();
-			pixelShaders.clear();
-			computeShaders.clear();
-
 			currentVS = 0;
 			currentPS = 0;
 			currentCS = 0;
@@ -820,7 +853,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 		filesystem::create_directories(fix_path_dump);
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
 			PSO* pso = &it->second;
-			if (runtime->is_key_down(VK_CONTROL)) {
+			if (!runtime->is_key_down(VK_CONTROL)) {
 				if (vertexShaders.count(pso->crcVS) == 1) {
 					swprintf_s(sPath, MAX_PATH, L"%08lX-vs.skip", pso->crcVS);
 					filesystem::path file = fix_path_dump / sPath;
@@ -876,7 +909,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	if (runtime->is_key_pressed(VK_NUMPAD3)) {
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
 			PSO* pso = &it->second;
-			if (pso->crcPS == currentPS) {
+			if (pso->crcPS == currentPS && currentPS != 0) {
 				filesystem::path file;
 				filesystem::create_directories(fix_path);
 				if (huntUsing2D) {
@@ -927,7 +960,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	if (runtime->is_key_pressed(VK_NUMPAD6)) {
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
 			PSO* pso = &it->second;
-			if (pso->crcVS == currentVS) {
+			if (pso->crcVS == currentVS && currentVS != 0) {
 				filesystem::path file;
 				filesystem::create_directories(fix_path);
 				if (huntUsing2D) {
@@ -978,7 +1011,7 @@ static void onReshadeBeginEffects(effect_runtime* runtime, command_list* cmd_lis
 	if (runtime->is_key_pressed(VK_NUMPAD9)) {
 		for (auto it = PSOmap.begin(); it != PSOmap.end(); ++it) {
 			PSO* pso = &it->second;
-			if (pso->crcCS == currentCS) {
+			if (pso->crcCS == currentCS && currentCS != 0) {
 				filesystem::path file;
 				filesystem::create_directories(fix_path);
 				if (huntUsing2D) {
@@ -1036,6 +1069,7 @@ static void load_config()
 	reshade::get_config_value(nullptr, "Geo3D", "QuickLoad", gl_quickLoad);
 	reshade::get_config_value(nullptr, "Geo3D", "Type", gl_type);
 	reshade::get_config_value(nullptr, "Geo3D", "DepthZ", gl_depthZ);
+	reshade::get_config_value(nullptr, "Geo3D", "Present", gl_present);
 
 	reshade::get_config_value(nullptr, "Geo3D", "StereoConvergence", gl_conv);
 	reshade::get_config_value(nullptr, "Geo3D", "StereoScreenSize", gl_screenSize);

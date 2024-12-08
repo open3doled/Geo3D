@@ -370,7 +370,9 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		size_t lastValue = 0;
 
 		string sOut = lines[outPos];
-		string sX = lines[outPos].substr(outLenght);
+		if (sOut.size() < outLenght)
+			continue;
+		string sX = sOut.substr(outLenght);
 		sX = sX.substr(0, sX.find(')'));
 		string sZ = lines[outPos + 2].substr(outLenght);
 		sZ = sZ.substr(0, sZ.find(')'));
@@ -378,6 +380,8 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 		sW = sW.substr(0, sW.find(')'));
 		string start = sOut.substr(0, sOut.find(sX));
 		string end = sOut.substr(sOut.find(sX) + sX.length());
+		if (sX.length() == 0)
+			return shaderOutput;
 
 		for (size_t i = outPos; i > 0; i--) {
 			string s = lines[i];
@@ -440,10 +444,17 @@ vector<UINT8> changeDXIL(vector<UINT8> ASM, bool left, float conv, float screenS
 			}
 
 			shaderS.push_back("  %" + to_string(lastValue + 1) + " = fadd fast float " + sX + ", 0.000000e+00");
-			shaderS.push_back("  %" + to_string(lastValue + 2) + " = fcmp fast une float " + sW + ", 1.000000e+00");
+			if (gl_depthZ)
+				shaderS.push_back("  %" + to_string(lastValue + 2) + " = fcmp fast une float " + sZ + ", 1.000000e+00");
+			else
+				shaderS.push_back("  %" + to_string(lastValue + 2) + " = fcmp fast une float " + sW + ", 1.000000e+00");
 			shaderS.push_back("  br i1 %" + to_string(lastValue + 2) + ", label %" + to_string(lastValue + 3) + ", label %" + to_string(lastValue + 7));
 			shaderS.push_back("");
 			shaderS.push_back("; <label>:" + to_string(lastValue + 3));
+			if (gl_depthZ)
+				shaderS.push_back("  %" + to_string(lastValue + 4) + " = fadd fast float " + sZ + ", " + convS);
+			else
+				shaderS.push_back("  %" + to_string(lastValue + 4) + " = fadd fast float " + sW + ", " + convS);
 			shaderS.push_back("  %" + to_string(lastValue + 4) + " = fadd fast float " + sW + ", " + convS);
 			shaderS.push_back("  %" + to_string(lastValue + 5) + " = fmul fast float %" + to_string(lastValue + 4) + ", " + sepS);
 			shaderS.push_back("  %" + to_string(lastValue + 6) + " = fadd fast float " + sX + ", %" + to_string(lastValue + 5));
