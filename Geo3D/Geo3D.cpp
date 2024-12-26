@@ -20,6 +20,18 @@ int gl_depthZ = false;
 bool gl_2D = false;
 bool gl_quickLoad = true;
 
+
+ImU32 whiteColor = IM_COL32(255, 255, 255, 255);
+ImU32 blackColor = IM_COL32(0, 0, 0, 255);
+bool triggerBox = false;
+bool triggerBoxInitialized = false;
+ImVec2 blackBackgroundTopLeft;
+ImVec2 blackBackgroundBottomRight;
+ImVec2 whiteLeftTopLeft;
+ImVec2 whiteLeftBottomRight;
+ImVec2 whiteRightTopLeft;
+ImVec2 whiteRightBottomRight;
+
 std::filesystem::path dump_path;
 std::filesystem::path fix_path;
 using namespace reshade::api;
@@ -1061,6 +1073,38 @@ static void load_config()
 
 static void onReshadeOverlay(reshade::api::effect_runtime* runtime)
 {
+	if (!triggerBoxInitialized) {
+		reshade::get_config_value(nullptr, "Geo3D", "TriggerBox", triggerBox);
+		float tempX, tempY;
+		reshade::get_config_value(nullptr, "Geo3D", "BlackBackgroundTopLeftX", tempX);
+		reshade::get_config_value(nullptr, "Geo3D", "BlackBackgroundTopLeftY", tempY);
+		blackBackgroundTopLeft = ImVec2(tempX, tempY);
+		reshade::get_config_value(nullptr, "Geo3D", "BlackBackgroundBottomRightX", tempX);
+		reshade::get_config_value(nullptr, "Geo3D", "BlackBackgroundBottomRightY", tempY);
+		blackBackgroundBottomRight = ImVec2(tempX, tempY);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteLeftTopLeftX", tempX);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteLeftTopLeftY", tempY);
+		whiteLeftTopLeft = ImVec2(tempX, tempY);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteLeftBottomRightX", tempX);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteLeftBottomRightY", tempY);
+		whiteLeftBottomRight = ImVec2(tempX, tempY);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteRightTopLeftX", tempX);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteRightTopLeftY", tempY);
+		whiteRightTopLeft = ImVec2(tempX, tempY);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteRightBottomRightX", tempX);
+		reshade::get_config_value(nullptr, "Geo3D", "WhiteRightBottomRightY", tempY);
+		whiteRightBottomRight = ImVec2(tempX, tempY);
+		triggerBoxInitialized = true;
+	}
+	if (triggerBox) {
+		ImGui::GetForegroundDrawList()->AddRectFilled(blackBackgroundTopLeft, blackBackgroundBottomRight, blackColor);
+		if (gl_left) {
+			ImGui::GetForegroundDrawList()->AddRectFilled(whiteLeftTopLeft, whiteLeftBottomRight, whiteColor);
+		}
+		else {
+			ImGui::GetForegroundDrawList()->AddRectFilled(whiteRightTopLeft, whiteRightBottomRight, whiteColor);
+		}
+	}
 	if (edit) {
 		ImGui::SetNextWindowPos(ImVec2(20, 20));
 		if (!ImGui::Begin("Geo3D", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
